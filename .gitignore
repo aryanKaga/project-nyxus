@@ -1,0 +1,7 @@
+# run this in the project nyxus root folder
+echo "env/
+node_modules/
+__pycache__/
+*.pyc
+env
+" > .gitignore
