@@ -1,0 +1,87 @@
+{
+  "name": "nyxus-coding-agent",
+  "displayName": "Nyxus Coding Agent",
+  "description": "An AI coding agent capable of web scraping and research.",
+  "version": "0.0.1",
+  "publisher": "your-name",
+  "main": "./extension.js",
+  "engines": {
+    "vscode": "^1.120.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "nyxus",
+          "title": "Nyxus",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "nyxus": [
+        {
+          "id": "nyxus.sidebar",
+          "name": "Nyxus Chat",
+          "type": "webview",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "nyxus.openSidebar",
+        "title": "Open Nyxus Sidebar"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Nyxus Coding Agent Configuration",
+      "properties": {
+        "nyxus.apiKey": {
+          "type": "string",
+          "default": "abc123",
+          "description": "API key for the AI service (e.g., OpenAI)."
+        },
+        "nyxus.model": {
+          "type": "string",
+          "description": "AI model to use (e.g., gpt-4)."
+        },
+        "nyxus.maxTokens": {
+          "type": "number",
+          "description": "Maximum tokens for AI responses."
+        },
+        "nyxus.url": {
+          "type": "string",
+          "description": "URL for the AI service endpoint.",
+          "default": "http://localhost:5000"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "npm run build:webview",
+    "build:webview": "cd webview-ui && npm install && npm run build",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.120.0",
+    "vsce": "^1.97.0"
+  },
+  "directories": {
+    "test": "test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "globals": "^17.6.0",
+    "socket.io-client": "^4.8.3",
+    "web-tree-sitter": "^0.26.9"
+  }
+}

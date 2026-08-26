@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Outer circle background -->
+  <circle cx="64" cy="64" r="62" fill="currentColor" opacity="0.1"/>
+  <circle cx="64" cy="64" r="58" fill="none" stroke="currentColor" stroke-width="2"/>
+  
+  <!-- Robot head -->
+  <rect x="38" y="30" width="52" height="50" rx="8" fill="currentColor" opacity="0.9"/>
+  
+  <!-- Left eye -->
+  <circle cx="48" cy="45" r="6" fill="currentColor" opacity="0.3"/>
+  <circle cx="48" cy="45" r="3" fill="currentColor"/>
+  
+  <!-- Right eye -->
+  <circle cx="80" cy="45" r="6" fill="currentColor" opacity="0.3"/>
+  <circle cx="80" cy="45" r="3" fill="currentColor"/>
+  
+  <!-- Antenna left -->
+  <line x1="45" y1="28" x2="42" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="42" cy="12" r="2" fill="currentColor"/>
+  
+  <!-- Antenna right -->
+  <line x1="83" y1="28" x2="86" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="86" cy="12" r="2" fill="currentColor"/>
+  
+  <!-- Mouth -->
+  <path d="M 55 58 Q 64 62 73 58" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  
+  <!-- Body -->
+  <rect x="44" y="78" width="40" height="35" rx="6" fill="currentColor" opacity="0.7"/>
+  
+  <!-- Chest panel lines -->
+  <line x1="52" y1="85" x2="76" y2="85" stroke="currentColor" stroke-width="1" opacity="0.5"/>
+  <line x1="52" y1="92" x2="76" y2="92" stroke="currentColor" stroke-width="1" opacity="0.5"/>
+  <line x1="52" y1="99" x2="76" y2="99" stroke="currentColor" stroke-width="1" opacity="0.5"/>
+  
+  <!-- Left arm -->
+  <rect x="28" y="90" width="14" height="8" rx="4" fill="currentColor" opacity="0.8"/>
+  
+  <!-- Right arm -->
+  <rect x="86" y="90" width="14" height="8" rx="4" fill="currentColor" opacity="0.8"/>
+  
+  <!-- LED indicator -->
+  <circle cx="64" cy="110" r="2.5" fill="#00ff00" opacity="0.8"/>
+</svg>
