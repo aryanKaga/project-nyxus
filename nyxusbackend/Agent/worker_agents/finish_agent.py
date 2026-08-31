@@ -1,17 +1,17 @@
 from langchain_core.messages import AIMessage
-from langchain_ollama import ChatOllama
-from Agent.state import State
 from langchain_google_genai import ChatGoogleGenerativeAI
+from google import genai
+from Agent.state import State
+import server_socket
 
-# NOTE: gemini-2.5-flash is no longer available to new users (404 NOT_FOUND).
-# Migrated to gemini-2.5-flash-lite.
-llm = ChatGoogleGenerativeAI(
-    model="gemini-3.5-flash-lite",
-    temperature=0,
-)
+
+
+client = genai.Client()
 
 
 def finish_agent(state: State) -> dict:
+
+    sid = state['user_api']
 
     prompt = f"""
 You are the final response generator for Nyxus, an AI coding assistant.
@@ -54,7 +54,7 @@ ANALYSIS / FIX
 CONVERSATION HISTORY
 ==================================================
 
-{state["messages"]}
+{state.get("messages", [])}
 
 ==================================================
 INSTRUCTIONS
@@ -68,10 +68,55 @@ INSTRUCTIONS
 - Be concise and direct.
 """
 
-    response = llm.invoke(prompt)
-    print("Final response generated:", response.content)
+    response_stream = client.models.generate_content_stream(
+        model='gemini-3.5-flash-lite',
+        contents=prompt
+    )   
+    full_response = ""
 
+    try:
+
+        for chunk in response_stream:
+
+            token = chunk.text
+
+            if not token:
+                continue
+
+            
+
+            server_socket.socketio.emit(
+                "assistant_chunk",
+                {"token": token},
+                room=sid
+            )
+
+        
+
+        server_socket.socketio.emit(
+            "assistant_end",
+            {},
+            room=sid
+        )
+
+    except Exception as e:
+
+        print("LLM STREAM ERROR:", repr(e))
+
+        server_socket.socketio.emit(
+            "assistant_error",
+            {
+                "error": str(e)
+            },
+            room=sid
+        )
+
+        raise
+    print(full_response)
     return {
-        "final_answer": response.content,
-        "messages": [AIMessage(content=response.content)]  # ✅ add_messages reducer handles appending
+        "final_answer": full_response,
+
+        "messages": [
+            AIMessage(content=full_response)
+        ]
     }

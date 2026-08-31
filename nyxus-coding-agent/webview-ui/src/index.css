@@ -1,2 +1,5 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
+@import "tailwindcss";
+@source "../node_modules/streamdown/dist/*.js";
+@source "../node_modules/@streamdown/math/dist/*.js";
 body, html, #root { height: 100%; background: #0d0d12; }

@@ -1,7 +1,7 @@
 const vscode = require('vscode');
 const path = require('path');
 const fs = require('fs');
-const { fetchAgentResponse } = require('./fetch_agent_response');
+
 const {create_code_graph} = require('../codegraph/parse_temp.js')
 const {build_directory} = require('../codegraph/dir_structure.js')
 const {send_init_data} = require('./send_nyxus_data') 
@@ -60,6 +60,8 @@ class SidebarProvider {
                 console.log('[Nyxus] Chat message sent:', {prompt: message.prompt,apikey:user_api});
             }
         })
+        
+        
 
     }
 

@@ -22,17 +22,28 @@ function createWebSocket(webview) {
     });
     console.log("[Nyxus] WebSocket created");
     socket.on("connect", () => {
-        console.log("[Nyxus] Connected to server");
+    console.log("[Nyxus] Connected to server");
     });
 
-    socket.on("assistant_chunk", (data) => {
+    socket.on("connect_error", (error) => {
+        console.error("[Nyxus] Connection error:", error.message);
+    });
 
-        webview.postMessage({
-            type: "assistant_chunk",
-            text: data.token
+
+    socket.on("assistant_start", () => {
+    webview.postMessage({
+        type: "assistant_start"
         });
-
     });
+    socket.on("assistant_chunk", (data) => {
+    webview.postMessage({
+        type: "assistant_chunk",
+        text: data.token
+        });
+        console.log(data.token)
+    });
+
+    
 
     socket.on("assistant_end", () => {
 
@@ -61,6 +72,7 @@ function createWebSocket(webview) {
                 file_name: file_name
             }
         );
+        console.log('file data for ',file_name,' sent')
 
     }
     catch (err) {

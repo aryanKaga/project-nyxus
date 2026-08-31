@@ -1,7 +1,37 @@
 # run this in the project nyxus root folder
-echo "env/
+env/
 node_modules/
 __pycache__/
 *.pyc
-env
-" > .gitignore
+.env
+**/dist/
+
+# Build output
+**/dist/
+**/build/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -10,12 +10,14 @@ from Agent.agent import create_graph
 
 import server_socket
 
-import threading
 import asyncio
 import uuid
 import os
 import logging
 import warnings
+import threading
+
+from concurrent.futures import ThreadPoolExecutor
 
 from langchain_core.messages import HumanMessage
 
@@ -75,6 +77,46 @@ server_socket.socketio = socketio
 user_to_state = {}
 user_to_data = {}
 user_to_high_level_dir = {}
+
+
+# ============================================================
+# Persistent asyncio event loop
+# ============================================================
+
+async_loop = asyncio.new_event_loop()
+
+
+def start_async_loop():
+    """
+    Run one persistent asyncio event loop.
+    This thread lives for the lifetime of the server.
+    """
+    asyncio.set_event_loop(async_loop)
+
+    print("Persistent asyncio event loop started")
+
+    async_loop.run_forever()
+
+
+async_loop_thread = threading.Thread(
+    target=start_async_loop,
+    daemon=True,
+    name="async-loop",
+)
+
+async_loop_thread.start()
+
+
+# ============================================================
+# Chat worker pool
+# ============================================================
+
+MAX_CHAT_WORKERS = 20
+
+chat_executor = ThreadPoolExecutor(
+    max_workers=MAX_CHAT_WORKERS,
+    thread_name_prefix="chat-worker",
+)
 
 
 # ============================================================
@@ -156,33 +198,94 @@ def handle_folder_data(data):
         )
 
 
+# ============================================================
+# Socket.IO: CHAT
+# ============================================================
+
 @socketio.on("chat")
 def chat(data):
+
     print("CHAT EVENT RECEIVED")
     print("Received data:", data)
 
     try:
-        thread = threading.Thread(
-            target=run_chat,
-            args=(data,),
-            daemon=True,
+
+        # Submit the synchronous wrapper to a bounded
+        # worker pool instead of creating an unlimited
+        # new thread for every request.
+
+        chat_executor.submit(
+            run_chat,
+            data,
         )
-        thread.start()
-        print("Chat background thread started")
+
+        print(
+            "Chat submitted to worker pool"
+        )
 
     except Exception as e:
-        print("ERROR starting chat thread:", repr(e))
 
+        print(
+            "ERROR submitting chat:",
+            repr(e)
+        )
+
+        api = data.get("apikey")
+
+        if api:
+            socketio.emit(
+                "chat_error",
+                {
+                    "error": str(e)
+                },
+                room=api,
+            )
+
+
+# ============================================================
+# CHAT WORKER
+# ============================================================
 
 def run_chat(data):
-    print("RUN_CHAT THREAD STARTED")
+
+    print(
+        f"CHAT WORKER STARTED "
+        f"thread={threading.current_thread().name}"
+    )
+
     try:
-        asyncio.run(process_chat(data))
+
+        # Submit the coroutine to the ONE persistent
+        # asyncio event loop.
+
+        future = asyncio.run_coroutine_threadsafe(
+            process_chat(data),
+            async_loop,
+        )
+
+        # Wait for the async operation to finish.
+        future.result()
+
+        print("CHAT WORKER FINISHED")
+
     except Exception as e:
-        print("RUN_CHAT ERROR:", repr(e))
+
+        print(
+            "RUN_CHAT ERROR:",
+            repr(e)
+        )
+
         api = data.get("apikey")
+
         if api:
-            socketio.emit("chat_error", {"error": str(e)}, room=api)
+
+            socketio.emit(
+                "chat_error",
+                {
+                    "error": str(e)
+                },
+                room=api,
+            )
 
 
 # ============================================================
@@ -190,63 +293,190 @@ def run_chat(data):
 # ============================================================
 
 async def process_chat(data):
+
     print("ASYNC CHAT STARTED")
 
     api = data["apikey"]
     prompt = data["prompt"]
 
-    print(f"Processing chat for api={api}")
+    print(
+        f"Processing chat for api={api}"
+    )
 
     try:
-        print("Creating user session...")
+
+        # ----------------------------------------------------
+        # Create session
+        # ----------------------------------------------------
+
+        print(
+            "Creating user session..."
+        )
+
         await create_user_session(api)
 
-        print("Retrieving user data...")
-        user_data = retrieve_user_data(user_to_data, api)
+
+        # ----------------------------------------------------
+        # Retrieve workspace data
+        # ----------------------------------------------------
+
+        print(
+            "Retrieving user data..."
+        )
+
+        user_data = retrieve_user_data(
+            user_to_data,
+            api,
+        )
 
         if not user_data:
-            raise RuntimeError("No workspace data found for this user")
+
+            raise RuntimeError(
+                "No workspace data found for this user"
+            )
+
+
+        # ----------------------------------------------------
+        # Create state
+        # ----------------------------------------------------
 
         state = State(
+
             user_session_id=api,
+
             prompt=prompt,
+
             user_api=api,
-            detailed_dir=user_data["folder_structure_data"],
-            root_dir=user_data["root_dir"],
+
+            detailed_dir=user_data[
+                "folder_structure_data"
+            ],
+
+            root_dir=user_data[
+                "root_dir"
+            ],
+
             high_level_dir="",
-            code_graph=user_data["graph_data"],
+
+            code_graph=user_data[
+                "graph_data"
+            ],
+
             messages=[
-                HumanMessage(content="User prompt: " + prompt)
+                HumanMessage(
+                    content="User prompt: " + prompt
+                )
             ],
         )
 
-        store_user_state(user_to_state, api, state)
-        print("State created")
+
+        store_user_state(
+            user_to_state,
+            api,
+            state,
+        )
+
+        print(
+            "State created"
+        )
+
+
+        # ----------------------------------------------------
+        # Create graph
+        # ----------------------------------------------------
+
+        print(
+            "Creating LangGraph..."
+        )
 
         graph = create_graph()
-        print("LangGraph created")
 
-        print("Starting graph.ainvoke()")
-        result = await graph.ainvoke(state)
-        print("LangGraph finished")
+        print(
+            "LangGraph created"
+        )
 
-        socketio.emit("chat_response", {"result": result}, room=api)
-        print("Response emitted to client")
+
+        # ----------------------------------------------------
+        # Run graph
+        # ----------------------------------------------------
+
+        print(
+            "Starting graph.ainvoke()"
+        )
+
+        result = await graph.ainvoke(
+            state
+        )
+
+        print(
+            "LangGraph finished"
+        )
+
+
+        # ----------------------------------------------------
+        # Send response
+        # ----------------------------------------------------
+
+        socketio.emit(
+            "chat_response",
+            {
+                "result": result
+            },
+            room=api,
+        )
+
+        print(
+            "Response emitted to client"
+        )
+
 
     except Exception as e:
-        print("\n================================")
-        print("ERROR IN ASYNC CHAT")
-        print(repr(e))
-        print("================================\n")
-        socketio.emit("chat_error", {"error": str(e)}, room=api)
+
+        print(
+            "\n================================"
+        )
+
+        print(
+            "ERROR IN ASYNC CHAT"
+        )
+
+        print(
+            repr(e)
+        )
+
+        print(
+            "================================\n"
+        )
+
+        socketio.emit(
+            "chat_error",
+            {
+                "error": str(e)
+            },
+            room=api,
+        )
+
         raise
 
+
     finally:
+
         try:
-            
-            print("User session deleted")
+
+            await delete_user_session(api)
+
+            print(
+                "User session deleted"
+            )
+
         except Exception as e:
-            print("SESSION DELETE ERROR:", repr(e))
+
+            print(
+                "SESSION DELETE ERROR:",
+                repr(e)
+            )
+
+
 # ============================================================
 # FILE CONTENT RESPONSE
 # ============================================================
@@ -356,6 +586,11 @@ if __name__ == "__main__":
     print(
         "SocketIO async mode:",
         socketio.async_mode
+    )
+
+    print(
+        "Chat worker limit:",
+        MAX_CHAT_WORKERS
     )
 
     print(
