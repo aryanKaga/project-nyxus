@@ -2,6 +2,8 @@
 const {get_file_content} = require('./helper_functions/get_file_content')
 const vscode  = require('vscode')
 const { io } = require("socket.io-client");
+const fs = require('fs');
+const path = require('path');
 /**
  * 
  * @param {*} webview 
@@ -22,7 +24,7 @@ function createWebSocket(webview) {
     });
     console.log("[Nyxus] WebSocket created");
     socket.on("connect", () => {
-    console.log("[Nyxus] Connected to server");
+        console.log("[Nyxus] Connected to server");
     });
 
     socket.on("connect_error", (error) => {
@@ -51,6 +53,35 @@ function createWebSocket(webview) {
             type: "assistant_end"
         });
 
+    });
+
+    socket.on("codebase_agent_complete", (data) => {
+        console.log('[Nyxus] Codebase agent finished:', data.response);
+
+        try {
+            const workspaceFolders = vscode.workspace.workspaceFolders;
+            if (workspaceFolders && workspaceFolders.length > 0) {
+                const workspaceRoot = workspaceFolders[0].uri.fsPath;
+                const memoryFilePath = path.join(workspaceRoot, 'nyxus_auto_memory.txt');
+
+                fs.writeFile(memoryFilePath, data.response, (err) => {
+                    if (err) {
+                        console.error('[Nyxus] Failed to write nyxus_auto_memory.txt:', err);
+                    } else {
+                        console.log('[Nyxus] Wrote codebase context to nyxus_auto_memory.txt');
+                    }
+                });
+            } else {
+                console.error('[Nyxus] No workspace folder open, cannot write nyxus_auto_memory.txt');
+            }
+        } catch (err) {
+            console.error('[Nyxus] Error writing nyxus_auto_memory.txt:', err);
+        }
+
+        webview.postMessage({
+            type: "codebase_agent_complete",
+            text: data.response
+        });
     });
 
     socket.on('get_file_content', async (data) => {

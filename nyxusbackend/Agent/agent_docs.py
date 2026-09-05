@@ -25,3 +25,7 @@ rather than further routing."""
 agent_docs["file_analyzing_agent"] = """Selects the next file(s) to analyze based on the user's request, the code graph,
 and the conversation history. Returns a single file path and reasoning for its selection."""
 
+agent_docs["context_creating_agent"] = """Builds contextual understanding of each file, codebase, and their cross relationships."""
+
+
+

@@ -5,6 +5,7 @@ const path = require('path')
 
 const config = vscode.workspace.getConfiguration('nyxus')
 const url = config.get('url')
+const {get_nyxus_auto_memory}  = require('./helper_functions/nyxus_auto_memmory.js')
 function gather_folder_data(){
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
         if(!workspaceRoot){
@@ -22,12 +23,34 @@ function gather_folder_data(){
  * @param {*} socket 
  */
 
+
+
+async function check_auto_memmory(socket){
+    const auto_memmory = await get_nyxus_auto_memory()
+    console.log('sending data to server')
+    const apikey = config.get('apiKey')
+    
+    const code_data = gather_folder_data()
+    const root_dir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;    
+    if(auto_memmory && auto_memmory !== 'false'){
+        socket.emit('send_auto_memmory',{auto_memmory: auto_memmory,apikey:apikey})
+    }
+}
+
+
+
+/**
+ * 
+ * @param {*} socket 
+ */
+
 async function send_init_data(socket){
     console.log('sending data to server')
     const apikey = config.get('apiKey')
     
     const code_data = gather_folder_data()
     const root_dir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const auto_memmory = await get_nyxus_auto_memory()
     if(!code_data){ 
         console.error('[Nyxus] No code data found to send');
         return;
@@ -38,7 +61,8 @@ async function send_init_data(socket){
         apiKey: apikey,
         graph_data: code_data.graph_data,
         folder_structure_data: code_data.folder_structure_data,
-        root_dir: root_dir
+        root_dir: root_dir,
+        auto_memmory:auto_memmory
     },
     /**
      * 
@@ -62,4 +86,4 @@ async function send_init_data(socket){
     
 }
 
-module.exports= {send_init_data}    
+module.exports= {send_init_data, check_auto_memmory}    

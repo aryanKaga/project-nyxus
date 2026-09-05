@@ -4,7 +4,7 @@ const fs = require('fs');
 
 const {create_code_graph} = require('../codegraph/parse_temp.js')
 const {build_directory} = require('../codegraph/dir_structure.js')
-const {send_init_data} = require('./send_nyxus_data') 
+const {send_init_data,check_auto_memmory} = require('./send_nyxus_data') 
 const {createWebSocket } = require('./create_websocket')
 /**
  * 
@@ -15,7 +15,8 @@ async function init(socket){
     await create_code_graph()
     await build_directory()
     console.log('build everything now sending data')
-    send_init_data(socket)
+    await send_init_data(socket)
+    await check_auto_memmory(socket)
 }
 
 
@@ -50,13 +51,14 @@ class SidebarProvider {
         this.socket = createWebSocket(webview)
         init(this.socket)
         webview.onDidReceiveMessage((message)=>{
+            const auto_memmory = check_auto_memmory(this.socket)
             if(message.type === 'chat'){
                 if(!this.socket){
                     console.error('[Nyxus] Socket not initialized');
                     return;
                 }
                 console.log('[Nyxus] Sending chat message:', message.prompt);
-                this.socket.emit('chat',{prompt: message.prompt, apikey: user_api})
+                this.socket.emit('chat',{prompt: message.prompt, apikey: user_api, auto_memmory: auto_memmory})
                 console.log('[Nyxus] Chat message sent:', {prompt: message.prompt,apikey:user_api});
             }
         })

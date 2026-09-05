@@ -298,6 +298,7 @@ async def process_chat(data):
 
     api = data["apikey"]
     prompt = data["prompt"]
+    auto_memmory = data.get("auto_memory", False)
 
     print(
         f"Processing chat for api={api}"
@@ -367,6 +368,7 @@ async def process_chat(data):
                     content="User prompt: " + prompt
                 )
             ],
+            auto_memory=auto_memmory,
         )
 
 
@@ -523,6 +525,9 @@ def file_content_response(data):
         "Server received file content "
         f"for request id {request_id}"
     )
+ 
+        
+    
 
 
 # ============================================================
@@ -572,6 +577,7 @@ def get_file_content():
         ), 500
 
 
+
 # ============================================================
 # MAIN
 # ============================================================
@@ -604,3 +610,5 @@ if __name__ == "__main__":
         port=5000,
         debug=True,
     )
+
+
