@@ -53,7 +53,7 @@ def router_condition(state: State):
 
 async def codebase_context_node(state: State) -> State:
     present_auto_memmory = state.get('auto_memmory')
-    if present_auto_memmory == None or present_auto_memmory == state.get('auto_memmory'):
+    if present_auto_memmory != None:
         return {}
     
     
