@@ -35,6 +35,7 @@ async function check_auto_memmory(socket){
     if(auto_memmory && auto_memmory !== 'false'){
         socket.emit('send_auto_memmory',{auto_memmory: auto_memmory,apikey:apikey})
     }
+    return auto_memmory
 }
 
 

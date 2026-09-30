@@ -1,32 +1,33 @@
-// extension.js
 const vscode = require('vscode');
-const { SidebarProvider } = require('./webviewprovider/SidebarProvider');
 
-/**
- * Called when the extension is activated.
- * @param {vscode.ExtensionContext} context
- */
 function activate(context) {
-    console.log('[Nyxus] Extension activated');
+    let sidebarProvider;
+    const lazySidebarProvider = {
+        resolveWebviewView(webviewView, contextForView, token) {
+            if (!sidebarProvider) {
+                const { SidebarProvider } = require('./webviewprovider/SidebarProvider');
+                sidebarProvider = new SidebarProvider(context);
+            }
 
-    const sidebarProvider = new SidebarProvider(context);
+            return sidebarProvider.resolveWebviewView(
+                webviewView,
+                contextForView,
+                token
+            );
+        }
+    };
 
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(
-            'nyxus.sidebar', // Must match package.json view id
-            sidebarProvider
+            'nyxus.sidebar',
+            lazySidebarProvider
+        ),
+        vscode.commands.registerCommand('nyxus.openSidebar', () =>
+            vscode.commands.executeCommand('workbench.view.extension.nyxus')
         )
     );
 }
 
-/**
- * Called when the extension is deactivated.
- */
-function deactivate() {
-    console.log('[Nyxus] Extension deactivated');
-}
+function deactivate() {}
 
-module.exports = {
-    activate,
-    deactivate
-};
+module.exports = { activate, deactivate };

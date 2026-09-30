@@ -5,8 +5,7 @@ lists key imports/exports/classes/functions/variables, and maps its relationship
 
 Invoke when: the user asks what a file does, where something is defined, how a module works,
 which files are involved in a feature, or asks for a repo/file summary — AND no context exists yet for that file.
-
-Do not invoke for: debugging, writing/changing code, planning, or workflow/architecture generation."""
+"""
 
 agent_docs["bug_finding_agent"] = """Analyzes a file (using its existing context) to locate, explain, or fix bugs
 and runtime errors. Can pull the live source code for the selected file via tool access.

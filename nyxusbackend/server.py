@@ -176,8 +176,12 @@ def handle_folder_data(data):
             "graph_data": data["graph_data"],
             "folder_structure_data": data["folder_structure_data"],
             "root_dir": data["root_dir"],
+            "auto_memory": data.get("auto_memory", ''),
         }
-
+        if len(user_data['auto_memory']) == 0:
+            print('no auto memory received')
+        else:
+            print('auto memory received')
         store_user_data(
             user_to_data,
             api,
@@ -298,8 +302,9 @@ async def process_chat(data):
 
     api = data["apikey"]
     prompt = data["prompt"]
-    auto_memmory = data.get("auto_memory", False)
-
+    auto_memmory = data.get("auto_memory", '')
+    if len(auto_memmory) > 0:
+        print('auto_memmory received in process_chat')
     print(
         f"Processing chat for api={api}"
     )
@@ -368,40 +373,31 @@ async def process_chat(data):
                     content="User prompt: " + prompt
                 )
             ],
-            auto_memory=auto_memmory,
+            auto_memory=user_data['auto_memory'],
         )
-
-
+     
         store_user_state(
             user_to_state,
             api,
             state,
         )
-
+        
         print(
             "State created"
         )
-
-
         # ----------------------------------------------------
         # Create graph
         # ----------------------------------------------------
-
         print(
             "Creating LangGraph..."
         )
-
         graph = create_graph()
-
         print(
             "LangGraph created"
         )
-
-
         # ----------------------------------------------------
         # Run graph
         # ----------------------------------------------------
-
         print(
             "Starting graph.ainvoke()"
         )
@@ -422,7 +418,9 @@ async def process_chat(data):
         socketio.emit(
             "chat_response",
             {
-                "result": result
+                "result": {
+                    "final_answer": result.get("final_answer", "")
+                }
             },
             room=api,
         )
@@ -610,5 +608,4 @@ if __name__ == "__main__":
         port=5000,
         debug=True,
     )
-
 

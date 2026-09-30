@@ -1,85 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
-import {
-  NyxusIcon,
-  SendIcon,
-  TypingDots,
-} from "./NyxusIcons";
-
 import "./NyxusChat.css";
-
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
-import rehypeRaw from "rehype-raw";
-import rehypeKatex from "rehype-katex";
-import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
-import "katex/dist/katex.min.css";
-
-
-/* =========================================================
-   MARKDOWN SANITIZATION
-   ========================================================= */
-
-/*
- * IMPORTANT: rehypeKatex must run BEFORE rehypeSanitize in the
- * plugin list below, and this schema must whitelist KaTeX's
- * generated tags/attrs — otherwise sanitize strips the math
- * markup right back out after katex renders it.
- */
-const markdownSanitizeSchema = {
-  ...defaultSchema,
-
-  attributes: {
-    ...defaultSchema.attributes,
-
-    code: [
-      ...(defaultSchema.attributes?.code || []),
-      "className",
-    ],
-
-    span: [
-      ...(defaultSchema.attributes?.span || []),
-      "className",
-      "style",
-    ],
-
-    div: [
-      ...(defaultSchema.attributes?.div || []),
-      "className",
-      "style",
-    ],
-
-    "*": [
-      ...(defaultSchema.attributes?.["*"] || []),
-      "className",
-    ],
-  },
-
-  tagNames: [
-    ...(defaultSchema.tagNames || []),
-    "math",
-    "semantics",
-    "mrow",
-    "mi",
-    "mo",
-    "mn",
-    "msup",
-    "msub",
-    "msubsup",
-    "mfrac",
-    "msqrt",
-    "mroot",
-    "mtable",
-    "mtr",
-    "mtd",
-    "mspace",
-    "mtext",
-    "mstyle",
-    "annotation",
-  ],
-};
-
+import ChatComposer from "./ChatComposer";
+import ChatHeader from "./ChatHeader";
+import MessageList from "./MessageList";
 
 /* =========================================================
    STREAM CONFIG
@@ -146,42 +70,6 @@ const vscode = acquireVsCodeApiSafe();
 
 
 /* =========================================================
-   MARKDOWN COMPONENT
-   ========================================================= */
-
-/*
- * IMPORTANT:
- *
- * This component should only be used for COMPLETED
- * assistant messages.
- *
- * We intentionally do NOT use ReactMarkdown while the
- * response is streaming (see the streaming bubble below) —
- * partial markdown/LaTeX syntax can be split across chunks
- * and renders incorrectly mid-stream.
- */
-function MarkdownMessage({ content }) {
-
-  return (
-    <div className="nyxus-markdown">
-
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkMath]}
-        rehypePlugins={[
-          rehypeRaw,
-          rehypeKatex,
-          [rehypeSanitize, markdownSanitizeSchema],
-        ]}
-      >
-        {content}
-      </ReactMarkdown>
-
-    </div>
-  );
-}
-
-
-/* =========================================================
    MAIN CHAT
    ========================================================= */
 
@@ -199,6 +87,10 @@ export default function NyxusChat() {
   const [isStreaming, setIsStreaming] = useState(false);
 
   const [streamingText, setStreamingText] = useState("");
+
+  const [connectionStatus, setConnectionStatus] = useState("connecting");
+
+  const [connectionError, setConnectionError] = useState("");
 
 
   /* =======================================================
@@ -339,6 +231,21 @@ export default function NyxusChat() {
 
 
       if (!msg || !msg.type) {
+        return;
+      }
+
+      if (msg.type === "server_status") {
+        const validStatuses = [
+          "connected",
+          "connecting",
+          "disconnected",
+          "error",
+        ];
+        const status = validStatuses.includes(msg.status)
+          ? msg.status
+          : "disconnected";
+        setConnectionStatus(status);
+        setConnectionError(status === "error" ? msg.error ?? "" : "");
         return;
       }
 
@@ -664,6 +571,11 @@ export default function NyxusChat() {
     }
   }
 
+  function handleReconnect() {
+    setConnectionStatus("connecting");
+    vscode.postMessage({ type: "reconnect" });
+  }
+
 
   /* =======================================================
      SEND MESSAGE
@@ -753,252 +665,35 @@ export default function NyxusChat() {
 
 
   /* =======================================================
-     WELCOME
-     ======================================================= */
-
-  const showWelcome =
-    messages.length === 0 &&
-    !isStreaming;
-
-
-  /* =======================================================
      RENDER
      ======================================================= */
 
   return (
 
     <div className="nyxus-root">
-
-
-      {/* =================================================
-          HEADER
-      ================================================= */}
-
-      <div className="nyxus-header">
-
-        <NyxusIcon size={24} />
-
-        <span className="nyxus-header-title">
-          Nyxus
-        </span>
-
-        <span className="nyxus-status-dot" />
-
-      </div>
-
-
-      {/* =================================================
-          MESSAGES
-      ================================================= */}
-
-      <div className="nyxus-messages">
-
-
-        {/* =================================================
-            WELCOME
-        ================================================= */}
-
-        {showWelcome && (
-
-          <div className="nyxus-welcome">
-
-            <div
-              style={{
-                color:
-                  "var(--nyxus-accent)",
-              }}
-            >
-
-              <NyxusIcon size={56} />
-
-            </div>
-
-
-            <div className="nyxus-welcome-text">
-
-              Hello! I am Nyxus.
-
-              <br />
-
-              How can I help you today?
-
-            </div>
-
-
-            <div className="nyxus-welcome-sub">
-
-              // ready to assist
-
-            </div>
-
-          </div>
-
-        )}
-
-
-        {/* =================================================
-            COMPLETED MESSAGES
-        ================================================= */}
-
-        {messages.map((msg, index) => (
-
-          <div
-            key={index}
-            className={`nyxus-msg ${msg.role}`}
-          >
-
-
-            {/* Avatar */}
-
-            <div className="nyxus-msg-avatar">
-
-              {msg.role === "assistant"
-                ? <NyxusIcon size={14} />
-                : "U"
-              }
-
-            </div>
-
-
-            {/* Message */}
-
-            <div className="nyxus-msg-bubble">
-
-
-              {msg.role === "assistant" ? (
-
-                <MarkdownMessage
-                  content={msg.text}
-                />
-
-              ) : (
-
-                msg.text
-
-              )}
-
-
-            </div>
-
-          </div>
-
-        ))}
-
-
-        {/* =================================================
-            CURRENT STREAMING MESSAGE
-        ================================================= */}
-
-        {isStreaming && (
-
-          <div className="nyxus-msg assistant">
-
-
-            {/* Avatar */}
-
-            <div className="nyxus-msg-avatar">
-
-              <NyxusIcon size={14} />
-
-            </div>
-
-
-            {/* Streaming bubble */}
-
-            <div className="nyxus-streaming-bubble">
-
-
-              {!streamingText ? (
-
-                <TypingDots />
-
-              ) : (
-
-                /*
-                 * IMPORTANT:
-                 *
-                 * DO NOT use ReactMarkdown here.
-                 *
-                 * Markdown/LaTeX may be incomplete because
-                 * responses can split syntax across chunks.
-                 */
-                <div className="nyxus-streaming-text">
-
-                  {streamingText}
-
-                  <span className="nyxus-cursor" />
-
-                </div>
-
-              )}
-
-            </div>
-
-
-          </div>
-
-        )}
-
-
-        {/* =================================================
-            SCROLL TARGET
-        ================================================= */}
-
-        <div ref={messagesEndRef} />
-
-
-      </div>
-
-
-      {/* =================================================
-          INPUT
-      ================================================= */}
-
-      <div className="nyxus-input-area">
-
-        <div className="nyxus-input-wrapper">
-
-
-          <textarea
-            ref={textareaRef}
-
-            className="nyxus-textarea"
-
-            placeholder="Ask Nyxus anything..."
-
-            rows={1}
-
-            value={input}
-
-            onChange={handleInputChange}
-
-            onKeyDown={handleKeyDown}
-
-            disabled={isStreaming}
-          />
-
-
-          <button
-            className="nyxus-send-btn"
-
-            onClick={handleSend}
-
-            disabled={
-              !input.trim() ||
-              isStreaming
-            }
-          >
-
-            <SendIcon />
-
-          </button>
-
-
-        </div>
-
-      </div>
-
-
+      <ChatHeader
+        connectionError={connectionError}
+        connectionStatus={connectionStatus}
+        onReconnect={handleReconnect}
+      />
+      <MessageList
+        isStreaming={isStreaming}
+        messages={messages}
+        messagesEndRef={messagesEndRef}
+        onSuggestion={(suggestion) => {
+          setInput(suggestion);
+          textareaRef.current?.focus();
+        }}
+        streamingText={streamingText}
+      />
+      <ChatComposer
+        input={input}
+        isStreaming={isStreaming}
+        onInputChange={handleInputChange}
+        onKeyDown={handleKeyDown}
+        onSend={handleSend}
+        textareaRef={textareaRef}
+      />
     </div>
 
   );

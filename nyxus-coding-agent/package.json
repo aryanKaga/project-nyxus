@@ -1,10 +1,14 @@
 {
   "name": "nyxus-coding-agent",
   "displayName": "Nyxus Coding Agent",
-  "description": "An AI coding agent capable of web scraping and research.",
+  "description": "A minimal Nyxus VS Code extension starter.",
   "version": "0.0.1",
   "publisher": "your-name",
   "main": "./extension.js",
+  "activationEvents": [
+    "onView:nyxus.sidebar",
+    "onCommand:nyxus.openSidebar"
+  ],
   "engines": {
     "vscode": "^1.120.0"
   },
@@ -64,8 +68,9 @@
   },
   "scripts": {
     "build": "npm run build:webview",
-    "build:webview": "cd webview-ui && npm install && npm run build",
-    "package": "vsce package"
+    "build:webview": "npm --prefix webview-ui run build",
+    "package": "vsce package",
+    "test:unit": "node --test test/unit"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

@@ -59,8 +59,13 @@ State: file=auth.py, context exists, user wants a fix -> bug_fixing_agent
 CONVERSATION SUMMARY
 {state.get("chat_history_summary", "No summary available.")}
 
+PREVIOUS CONTEXT OF REPO:
+{state.get('auto_memory','no previous context yet')}
+
 EXECUTION TRACE (most recent steps, chronological)
 {recent_trace}
+
+
 
 CURRENT STATE
 Current Selected File: {state.get("curr_file_name", "None")}
@@ -88,5 +93,4 @@ Give brief reasoning, then pick exactly one agent.
         ),
         "messages": [SystemMessage(content=f"Router decision: {result.next_agent}. Reasoning: {result.reasoning}")]
     }
-
 

@@ -17,18 +17,52 @@ function createWebSocket(webview) {
     const url = config.get('url')
     const user_api  = config.get('apiKey')
     const socket = io(url,{
+        autoConnect: true,
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 10000,
         auth: {
             apikey:user_api,
             userid:config.get('userId')
         }
     });
     console.log("[Nyxus] WebSocket created");
+    webview.postMessage({
+        type: "server_status",
+        status: "connecting"
+    });
+
     socket.on("connect", () => {
         console.log("[Nyxus] Connected to server");
+        webview.postMessage({
+            type: "server_status",
+            status: "connected"
+        });
     });
 
     socket.on("connect_error", (error) => {
         console.error("[Nyxus] Connection error:", error.message);
+        webview.postMessage({
+            type: "server_status",
+            status: "error",
+            error: error.message
+        });
+    });
+
+    socket.on("disconnect", (reason) => {
+        console.warn("[Nyxus] Disconnected from server:", reason);
+        webview.postMessage({
+            type: "server_status",
+            status: "disconnected",
+            error: reason
+        });
+    });
+
+    socket.io.on("reconnect_attempt", () => {
+        webview.postMessage({
+            type: "server_status",
+            status: "connecting"
+        });
     });
 
 

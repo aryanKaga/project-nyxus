@@ -30,7 +30,7 @@ class State(TypedDict):
 
     execution_trace: List[TraceEntry]
     router_decision_history: List[str]
-    auto_memmory:str
+    auto_memory:str
 
 
 def add_trace(state: State, agent: str, action: str, result: str) -> List[TraceEntry]:

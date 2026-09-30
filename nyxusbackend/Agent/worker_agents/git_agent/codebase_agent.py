@@ -45,7 +45,7 @@ class ReplannerOutput(BaseModel):
 class PlannerState(TypedDict):
     user_id: str
     description: str
-    past_steps: Annotated[List[BaseMessage], add_messages]
+    past_results: Annotated[List[BaseMessage], add_messages]
     plan: List[str]
     response: str
     code_graph: str
@@ -149,7 +149,7 @@ async def build_graph():
 
         trace = add_trace(
             {"execution_trace": trace}, "planner", "end",
-            json.dumps({"steps": result.steps, "duration_ms": round((time.monotonic() - start) * 1000)})
+            json.dumps({"original layout for planning the execution": "completed", "duration_ms": round((time.monotonic() - start) * 1000)})
         )
 
         return {"plan": result.steps, "execution_trace": trace}
@@ -164,6 +164,7 @@ async def build_graph():
         start = time.monotonic()
         trace = list(state.get("execution_trace", []))
 
+        
         trace = add_trace({"execution_trace": trace}, "executor", "start", task)
 
         messages: List[BaseMessage] = [
@@ -228,13 +229,13 @@ async def build_graph():
                 {"execution_trace": trace}, "executor", "end",
                 json.dumps({
                     "duration_ms": round((time.monotonic() - start) * 1000),
-                    "result_preview": str(getattr(final_ai_msg, "content", ""))[:300],
+                    "result_preview": str(getattr(final_ai_msg, "content", ""))[:100],
                 })
             )
 
             return {
                 "plan": plan[1:],
-                "past_steps": [HumanMessage(content=task), final_ai_msg],
+                "past_results": [HumanMessage(content=task), final_ai_msg],
                 "execution_trace": trace,
             }
         except Exception as e:
@@ -243,14 +244,14 @@ async def build_graph():
             return {"execution_trace": trace}
 
     async def replanner_node(state: PlannerState) -> dict:
-        start = time.monotonic()
+       
         trace = list(state.get("execution_trace", []))
 
         trace = add_trace(
             {"execution_trace": trace}, "replanner", "start",
             json.dumps({
                 "remaining_plan": state.get("plan"),
-                "completed_step_count": len(state.get("past_steps", [])),
+                "completed_step_count": len(state.get("past_results", [])),
             })
         )
 
@@ -258,7 +259,7 @@ async def build_graph():
             SystemMessage(content=REPLANNER_PROMPT),
             HumanMessage(
                 content=(
-                    f"Completed steps: {state['past_steps']}\n"
+                    f"Completed steps: {state['past_results']}\n"
                     f"Remaining plan: {state['plan']}"
                 )
             ),
@@ -274,11 +275,12 @@ async def build_graph():
             trace = add_trace(
                 {"execution_trace": trace}, "replanner", "final_response", result.action.response[:300]
             )
+            
             emit_final_response(state.get("user_id"), result.action.response)
             return {"response": result.action.response, "plan": [], "execution_trace": trace}
 
         trace = add_trace(
-            {"execution_trace": trace}, "replanner", "updated_plan", json.dumps(result.action.steps)
+            {"execution_trace": trace}, "replanner", "updated_plan", "plan updated sucessfully"
         )
         return {"plan": result.action.steps, "execution_trace": trace}
 
@@ -303,7 +305,7 @@ async def main():
     result = await app.ainvoke({
         "user_id": "some-room-id",
         "description": "your task description",
-        "past_steps": [],
+        "past_results": [],
         "plan": [],
         "response": "",
         "code_graph": "",

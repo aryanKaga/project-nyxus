@@ -9,6 +9,7 @@ from Agent.worker_agents.context_creating_agent import context_creating_agent
 from Agent.worker_agents.bug_fixing_agent import bug_fixing_agent
 from Agent.worker_agents.finish_agent import finish_agent
 from Agent.worker_agents.git_agent.codebase_agent import build_graph,PlannerState
+from Agent.worker_agents.context_filter_agent import filter_context_agent
 import json
 MAX_ROUTER_ITERATIONS = 20
 
@@ -52,8 +53,8 @@ def router_condition(state: State):
 
 
 async def codebase_context_node(state: State) -> State:
-    present_auto_memmory = state.get('auto_memmory')
-    if present_auto_memmory != None:
+    present_auto_memmory = state.get('auto_memory')
+    if  len(present_auto_memmory) > 0:
         return {}
     
     
@@ -62,6 +63,7 @@ async def codebase_context_node(state: State) -> State:
         code_graph=state["code_graph"],
         directory_structure=state["detailed_dir"],
         iterations=0,
+        description='create a detailed automemmory context of the codebase'
     )
 
     agent_graph = await build_graph()
@@ -86,7 +88,8 @@ def create_graph():
     # -------------------------------------------------
 
     builder.add_node("codebase_agent", codebase_context_node)
-
+    
+    builder.add_node('context_filter_agent',filter_context_agent)
     builder.add_node("message_summarizer", message_summarizer)
     builder.add_node("router_agent", router_agent)
 
@@ -101,12 +104,13 @@ def create_graph():
     # -------------------------------------------------
 
     builder.add_edge(START, "codebase_agent")
-    builder.add_edge(START, "message_summarizer")
+    builder.add_edge(START, "context_filter_agent")
+    builder.add_edge('context_filter_agent','message_summarizer')
 
     # -------------------------------------------------
     # Main workflow
     # -------------------------------------------------
-
+    
     builder.add_edge(
         "message_summarizer",
         "router_agent"

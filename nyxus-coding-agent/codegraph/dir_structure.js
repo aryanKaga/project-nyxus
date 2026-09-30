@@ -3,7 +3,7 @@ const path = require('path');
 const vscode = require('vscode');
 
 const IGNORE_FOLDERS = new Set([
-    'node_modules', '.git', '.vscode', 'dist', 'build', '.next',
+    'node_modules', '.git', '.vscode', '.nyxus', 'dist', 'build', '.next',
     'coverage', 'venv', 'env', '__pycache__', 'myenv', '.idea',
     '.pytest_cache', '.mypy_cache', 'out', 'target', '.turbo', '.cache'
 ]);
@@ -22,18 +22,10 @@ const IGNORE_EXTENSIONS = new Set(['.log', '.lock', '.map']);
  * Files   -> "name" (bare string)
  *
  * @param {string} dirPath
- * @returns {(string|Object)[]} array of children for dirPath
+ * @returns {Promise<(string|Object)[]>} array of children for dirPath
  */
-function buildChildren(dirPath) {
-    let entries;
-
-    try {
-        entries = fs.readdirSync(dirPath, { withFileTypes: true });
-    } catch (err) {
-        console.error(`Failed to read ${dirPath}:`, err);
-        return [];
-    }
-
+async function buildChildren(dirPath) {
+    const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
     const children = [];
 
     for (const entry of entries) {
@@ -51,7 +43,7 @@ function buildChildren(dirPath) {
         const fullPath = path.join(dirPath, entry.name);
 
         if (entry.isDirectory()) {
-            children.push({ [entry.name]: buildChildren(fullPath) });
+            children.push({ [entry.name]: await buildChildren(fullPath) });
         } else {
             children.push(entry.name);
         }
@@ -60,20 +52,18 @@ function buildChildren(dirPath) {
     return children;
 }
 
-function build_directory() {
+async function build_directory() {
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!workspaceRoot) {
         return;
     }
 
     const graphdir = path.join(workspaceRoot, '.nyxus');
-    if (!fs.existsSync(graphdir)) {
-        fs.mkdirSync(graphdir, { recursive: true });
-    }
+    await fs.promises.mkdir(graphdir, { recursive: true });
 
-    const tree = { [path.basename(workspaceRoot)]: buildChildren(workspaceRoot) };
+    const tree = { [path.basename(workspaceRoot)]: await buildChildren(workspaceRoot) };
 
-    fs.writeFileSync(
+    await fs.promises.writeFile(
         path.join(graphdir, 'directory_structure.json'),
         JSON.stringify(tree)
     );

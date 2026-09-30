@@ -59,6 +59,8 @@ Code Graph:
 {code_graph}
 History:
 {state.get("chat_history_summary", "No summary available.")}
+Previous Context of repo:
+{state.get('auto_memory','no previous context yet')}
 Execution Trace:
 {state.get('execution_trace','no execution trace yet')}
 Router Reasoning:
@@ -78,3 +80,4 @@ Router Reasoning:
         ),
         "messages": [AIMessage(content=f"File selected for analysis: {result.file_name} (confidence: {result.confidence}) and reasoning: {result.reasoning})")]
     }
+
