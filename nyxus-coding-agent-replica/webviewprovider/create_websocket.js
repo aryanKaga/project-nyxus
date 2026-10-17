@@ -9,7 +9,7 @@ const path = require('path');
  * @param {*} logFlow 
  * @returns 
  */
-function createWebSocket(webview, logFlow) {
+function createWebSocket(webview, logFlow, onArchitectureDiagram, onReadmeAnswer) {
     const config = vscode.workspace.getConfiguration('nyxusReplica');
     const socket = io(config.get('url'), {
         auth: {
@@ -68,9 +68,77 @@ function createWebSocket(webview, logFlow) {
         postMessage({ type: 'assistant_chunk', text: data.token });
     });
 
+    socket.on('assistant_progress', (data) => {
+        postMessage({
+            type: 'assistant_progress',
+            message: typeof data?.message === 'string'
+                ? data.message
+                : 'Still working on your request…'
+        });
+    });
+
+    socket.on('architecture_diagram', (data) => {
+        if (
+            typeof data?.filename !== 'string'
+            || typeof data?.title !== 'string'
+            || typeof data?.html !== 'string'
+        ) {
+            logFlow('receive.architecture_diagram.invalid');
+            return;
+        }
+        logFlow('receive.architecture_diagram');
+        if (typeof onArchitectureDiagram !== 'function') {
+            logFlow('receive.architecture_diagram.handler_missing');
+            postMessage({
+                type: 'initialization_error',
+                text: 'Nyxus sent an architecture diagram, but VS Code has no handler to save it.'
+            });
+            return;
+        }
+        Promise.resolve().then(() => onArchitectureDiagram(data)).catch(() => {
+            logFlow('architecture_diagram.open.failed');
+            postMessage({
+                type: 'initialization_error',
+                text: 'The architecture HTML reached VS Code but could not be saved or opened. Check the Nyxus Replica output log.'
+            });
+        });
+    });
+
+    socket.on('readme_answer', (data) => {
+        if (data?.filename !== 'answer.md' || typeof data.markdown !== 'string') {
+            logFlow('receive.readme_answer.invalid');
+            return;
+        }
+        logFlow('receive.readme_answer');
+        if (typeof onReadmeAnswer !== 'function') {
+            logFlow('receive.readme_answer.handler_missing');
+            postMessage({
+                type: 'initialization_error',
+                text: 'Nyxus sent a README answer, but VS Code has no handler to save it.'
+            });
+            return;
+        }
+        Promise.resolve().then(() => onReadmeAnswer(data)).catch(() => {
+            logFlow('readme_answer.open.failed');
+            postMessage({
+                type: 'initialization_error',
+                text: 'The README answer reached VS Code but could not be saved or opened.'
+            });
+        });
+    });
+
     socket.on('assistant_end', () => {
         logFlow('receive.assistant_end');
         postMessage({ type: 'assistant_end' });
+    });
+
+    socket.on('agent_trace', (data) => {
+        if (!Array.isArray(data?.trace)) {
+            logFlow('receive.agent_trace.invalid');
+            return;
+        }
+        logFlow('receive.agent_trace');
+        postMessage({ type: 'agent_trace', trace: data.trace });
     });
 
     socket.on('assistant_error', (data) => {

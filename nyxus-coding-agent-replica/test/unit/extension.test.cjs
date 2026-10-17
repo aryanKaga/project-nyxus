@@ -6,6 +6,7 @@ const { after, test } = require('node:test');
 const originalLoad = Module._load;
 const registeredCommands = new Map();
 let registeredView;
+let registeredViewOptions;
 let notification;
 let providerLoadCount = 0;
 let providerResolveCount = 0;
@@ -31,8 +32,9 @@ Module._load = function (request, parent, isMain) {
                         dispose() {}
                     };
                 },
-                registerWebviewViewProvider(viewId, provider) {
+                registerWebviewViewProvider(viewId, provider, options) {
                     registeredView = { viewId, provider };
+                    registeredViewOptions = options;
                     return { dispose() {} };
                 },
                 showInformationMessage(message) {
@@ -82,6 +84,9 @@ test('keeps extension activation lightweight and loads the sidebar on demand', a
     assert.ok(registeredCommands.has('nyxusReplica.sayHi'));
     assert.ok(registeredCommands.has('nyxusReplica.openSidebar'));
     assert.equal(registeredView.viewId, 'nyxusReplica.sidebar');
+    assert.deepEqual(registeredViewOptions, {
+        webviewOptions: { retainContextWhenHidden: true }
+    });
 
     let renderedHtml = '';
     let webviewOptions;

@@ -1,0 +1,12 @@
+{
+  "name": "nyxus-hybridbackend",
+  "version": "1.0.0",
+  "description": "Nyxus hybrid backend for codebase exploration and analysis",
+  "scripts": {
+    "start": "python3 server.py",
+    "dev": "FLASK_DEBUG=1 python3 server.py"
+  },
+  "dependencies": {
+    "@lzehrung/codegraph-core": "^3.0.0"
+  }
+}

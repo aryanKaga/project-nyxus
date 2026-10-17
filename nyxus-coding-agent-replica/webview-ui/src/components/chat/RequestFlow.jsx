@@ -1,6 +1,6 @@
 export default function RequestFlow({ events }) {
   return (
-    <details className="nyxus-flow">**
+    <details className="nyxus-flow">
       <summary>Request flow ({events.length})</summary>
       <ol>
         {events.map((entry, index) => (

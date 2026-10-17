@@ -13,6 +13,7 @@
     "@streamdown/math": "^1.0.2",
     "@tailwindcss/vite": "^4.3.3",
     "katex": "^0.18.4",
+    "mermaid": "^12.2.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-markdown": "^10.1.0",

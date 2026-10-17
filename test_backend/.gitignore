@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+workspaces/
+.nyxus/traces/
+.venv/
+.env
+atlas-credentials.env

@@ -46,7 +46,7 @@
       "properties": {
         "nyxusReplica.url": {
           "type": "string",
-          "default": "http://localhost:5000",
+          "default": "http://localhost:3000",
           "description": "URL of the Nyxus Socket.IO server."
         },
         "nyxusReplica.apiKey": {
@@ -62,7 +62,7 @@
     "build:webview": "npm --prefix webview-ui run build",
     "package": "vsce package",
     "test": "npm run build && npm run test:unit",
-    "test:unit": "node --test test/unit/extension.test.cjs test/unit/dir_structure.test.cjs test/unit/code_graph.test.cjs"
+    "test:unit": "node --test test/unit/extension.test.cjs test/unit/dir_structure.test.cjs test/unit/code_graph.test.cjs test/unit/architecture_diagram_file.test.cjs test/unit/answer_markdown_file.test.cjs"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
@@ -79,6 +79,7 @@
   "dependencies": {
     "globals": "^17.6.0",
     "socket.io-client": "^4.8.3",
-    "web-tree-sitter": "^0.26.9"
+    "web-tree-sitter": "^0.26.9",
+    "yazl": "^2.5.1"
   }
 }

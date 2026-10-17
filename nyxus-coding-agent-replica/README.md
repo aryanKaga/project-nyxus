@@ -6,6 +6,13 @@ when the sidebar opens. Indexing writes `.nyxus/repo-mapping.json` and
 The Nyxus server remains disconnected, and sending a message reports that
 server access is disabled.
 
+When connected to the configured backend, turn on **README mode** above the
+composer to have Nyxus's README-writing role format each response as Markdown.
+The extension saves the latest formatted response to `answer.md` in the active
+workspace and opens its VS Code Markdown preview. Responses appear as
+collapsible `answer.md` envelopes in the chat; opening an envelope also opens
+the saved preview. The mode preference is retained with the workspace chat.
+
 ## Build and test
 
 Run `npm test` in this folder to build the React bundle and run the extension

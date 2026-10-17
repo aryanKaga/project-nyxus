@@ -1,0 +1,84 @@
+{
+  "name": "nyxus-coding-agent-replica",
+  "displayName": "Nyxus Coding Agent Replica",
+  "description": "A minimal VS Code activation test for Nyxus.",
+  "version": "0.0.1",
+  "publisher": "your-name",
+  "main": "./extension.js",
+  "engines": {
+    "vscode": "^1.120.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "nyxusReplica",
+          "title": "Nyxus Replica",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "nyxusReplica": [
+        {
+          "id": "nyxusReplica.sidebar",
+          "name": "Nyxus Chat",
+          "type": "webview",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "nyxusReplica.sayHi",
+        "title": "Nyxus Test: Say Hi"
+      },
+      {
+        "command": "nyxusReplica.openSidebar",
+        "title": "Open Nyxus Replica Sidebar"
+      }
+    ],
+    "configuration": {
+      "title": "Nyxus Replica",
+      "properties": {
+        "nyxusReplica.url": {
+          "type": "string",
+          "default": "http://localhost:3000",
+          "description": "URL of the Nyxus workspace receiver."
+        },
+        "nyxusReplica.apiKey": {
+          "type": "string",
+          "default": "abc123",
+          "description": "API key used to identify this Nyxus client on the server."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "npm run build:webview",
+    "build:webview": "npm --prefix webview-ui run build",
+    "package": "vsce package",
+    "test": "npm run build && npm run test:unit",
+    "test:unit": "node --test test/unit/extension.test.cjs test/unit/workspace_archive.test.cjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.120.0",
+    "vsce": "^1.97.0"
+  },
+  "directories": {
+    "test": "test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "globals": "^17.6.0",
+    "socket.io-client": "^4.8.3",
+    "web-tree-sitter": "^0.26.9"
+  }
+}

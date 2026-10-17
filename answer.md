@@ -1,0 +1,1 @@
+**Error:** Nyxus is not connected. Check the server URL and try again.

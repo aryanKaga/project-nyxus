@@ -45,7 +45,11 @@ function activate(context) {
             });
         }
     };
-    const sidebar = vscode.window.registerWebviewViewProvider('nyxusReplica.sidebar', viewProvider);
+    const sidebar = vscode.window.registerWebviewViewProvider(
+        'nyxusReplica.sidebar',
+        viewProvider,
+        { webviewOptions: { retainContextWhenHidden: true } }
+    );
     const cleanup = {
         dispose() {
             if (initializationTimer !== undefined) {
