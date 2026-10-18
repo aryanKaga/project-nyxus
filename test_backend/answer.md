@@ -1,19 +1,32 @@
-# Making Antigravity File Changes Persistent
+# What Workspace "Touching" (`_touch_workspace`) Does
 
-If Antigravity makes changes to files during a session but you cannot see them reflected on your disk, it typically means the modifications are currently isolated in memory, a temporary sandbox, or an uncommitted workspace layer. 
+The function `_touch_workspace(workspace_id)` in **`server.py`** (lines 67–86) updates the activity timestamp of a specified workspace. Its primary purpose is to act as a heartbeat mechanism for workspace session management, preventing active workspaces from being treated as idle and cleaned up.
 
-To make these changes persistent to your actual files, ensure the modifications are explicitly written back to disk storage and synced to the database by checking the following key mechanisms:
+---
 
-## 1. Verify the Target Storage Path (`STORAGE_DIR`)
-Workspaces are not necessarily stored in your project's root directory. 
-* **Location:** They are stored under the directory specified by the `WORKSPACE_STORAGE` environment variable, or in the default `workspaces/` folder relative to the server root (`server.py:27`).
-* **Action:** Ensure you are navigating to the exact workspace UUID folder inside that directory (`STORAGE_DIR / workspace_id`) rather than your local development directory.
+## Detailed Breakdown
 
-## 2. Trigger the Workspace Sync and Archive
-The application relies on archives being explicitly saved or transmitted to write data back to the disk and database layer.
-* **Mechanism:** Changes must be packed into an archive and sent to the server/database layer via handlers like the Socket.IO event `workspace_archive` or explicit save operations.
-* **Backend:** This triggers `MongoStore.save_workspace` (`database/mongo_store.py:65-89`), which persists the data to MongoDB and unpacks it into the designated workspace storage directory.
+The touching process consists of three main steps: validation, updating the file activity marker, and updating in-memory tracking.
 
-## 3. Check for Sandbox-Only or In-Memory Isolation
-If tools are editing files inside an isolated container, temporary directory, or in-memory file system, they will not automatically bleed into the host filesystem.
-* **Action:** Verify that your workflow or agent invokes the upload/save pipeline (such as `unpack_workspace_archive`) after completing edits. Without triggering this save/archive endpoint, changes remain trapped in isolation and will not appear in the main workspace directory on disk.
+### 1. Validation (Lines 68–74)
+Before any activity is recorded, the function validates the input:
+* Verifies that the `workspace_id` is a valid string.
+* Ensures the ID is formatted as a valid UUID.
+* **Security benefit:** This validation step prevents directory traversal attacks and rejects malformed inputs.
+
+### 2. File Activity Marker Update (Lines 76–83)
+The function maintains a physical file system record of workspace activity to allow background cleanup routines to inspect file metadata:
+* **Path Construction:** Constructs a target path inside the storage directory: `STORAGE_DIR / ".workspace-activity" / workspace_id`.
+* **Directory & Marker Creation:** Ensures parent directories exist using `mkdir(parents=True, exist_ok=True)` and updates the marker file using `.touch(exist_ok=True)`.
+* **Timestamp Modification:** Uses `os.utime(marker, (now, now))` to explicitly update the file's access and modification timestamps (`mtime`) to the current system time. Background tasks inspect this metadata to determine how long a workspace has been idle.
+
+### 3. In-Memory Tracking (Lines 84–85)
+Alongside the file system update, the function maintains fast, in-memory state:
+* Updates an in-memory dictionary (`workspace_last_access[workspace_id] = now`).
+* Operates under thread-safe locking (`_workspace_sessions_lock`) to safely track active workspaces in concurrent environments.
+
+---
+
+## Summary of Purpose
+
+`_touch_workspace` is invoked whenever a workspace is accessed, interacted with, or has a task initiated (for example, via `_begin_workspace_task` on lines 88–89). By refreshing both file metadata and in-memory state, it reliably prevents active workspaces from reaching their idle Time-To-Live (TTL) threshold and being prematurely cleaned up.

@@ -52,6 +52,9 @@ class SocketIOTestClient:
         self.app = app
         self.sid = "test-sid-" + uuid.uuid4().hex[:8]
         self.received = []
+        if document is None:
+            return None
+
         self._orig_emit = sio.emit
 
         def test_emit(event, data=None, to=None, **kwargs):
@@ -572,6 +575,7 @@ async def connect_client(sid, environ, auth=None):
 
 @socketio.on("workspace_archive")
 def receive_workspace_archive(sid, data):
+    "stores the data inside "
     if not isinstance(data, dict):
         return {"ok": False, "error": "Invalid workspace archive request."}
     if not _authorized(data):
@@ -590,6 +594,7 @@ def receive_workspace_archive(sid, data):
     except ArchiveError as error:
         return {"ok": False, "error": str(error)}
     except Exception:
+        "if not stored in mongo db , delete the workspace from server as well"
         if result is not None:
             shutil.rmtree(STORAGE_DIR / result["workspace_id"], ignore_errors=True)
         logger.exception("Failed to receive workspace archive")
@@ -600,6 +605,7 @@ def receive_workspace_archive(sid, data):
 
     _touch_workspace(result["workspace_id"])
     with _workspace_sessions_lock:
+        "remove the previous cached workspace from the server and gives the new one"
         previous = workspace_sessions.pop(sid, None)
         if previous is not None:
             user_to_workspaceid.pop(sid, None)
