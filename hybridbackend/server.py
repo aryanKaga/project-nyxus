@@ -1,16 +1,20 @@
+import asyncio
+from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
 import logging
 import os
-import shutil
-import time
-from dataclasses import dataclass, field
 from pathlib import Path
+import shutil
 import sys
 import threading
+import time
 import uuid
 
 from dotenv import load_dotenv
-from flask import Flask, request
-from flask_socketio import SocketIO
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+import socketio as python_socketio
+import uvicorn
 
 from database.mongo_store import get_mongo_store, user_key
 from ingestion.workspace_receiver import (
@@ -36,15 +40,102 @@ if str(AGENT_DIR) not in sys.path:
 from timeouts import AgentTimeoutError, task_deadline
 from readme_writer import stream_readme_answer, write_readme_answer
 
-app = Flask(__name__)
-socketio = SocketIO(
-    app,
-    cors_allowed_origins="*",
-    async_mode="threading",
-    max_http_buffer_size=MAX_ARCHIVE_BYTES + 1024 * 1024,
-)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("hybridbackend")
+
+_main_loop = None
+
+
+class SocketIOTestClient:
+    def __init__(self, sio, app=None):
+        self.sio = sio
+        self.app = app
+        self.sid = "test-sid-" + uuid.uuid4().hex[:8]
+        self.received = []
+        self._orig_emit = sio.emit
+
+        def test_emit(event, data=None, to=None, **kwargs):
+            if to is None or to == self.sid:
+                self.received.append({"name": event, "args": [data] if data is not None else []})
+            return None
+
+        sio.emit = test_emit
+
+    def emit(self, event, *args, callback=False):
+        handler = self.sio.handlers.get("/", {}).get(event)
+        if not handler:
+            return None
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        if asyncio.iscoroutinefunction(handler):
+            res = loop.run_until_complete(handler(self.sid, *args))
+        else:
+            res = handler(self.sid, *args)
+        return res
+
+    def get_received(self):
+        r = list(self.received)
+        self.received.clear()
+        return r
+
+    def disconnect(self):
+        self.sio.emit = self._orig_emit
+        handler = self.sio.handlers.get("/", {}).get("disconnect")
+        if handler:
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            if asyncio.iscoroutinefunction(handler):
+                loop.run_until_complete(handler(self.sid))
+            else:
+                handler(self.sid)
+
+
+class AsyncSocketIOServer(python_socketio.AsyncServer):
+    def emit(self, event, data=None, to=None, **kwargs):
+        coro = super().emit(event, data, to=to, **kwargs)
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            return loop.create_task(coro)
+        elif _main_loop and _main_loop.is_running():
+            return asyncio.run_coroutine_threadsafe(coro, _main_loop)
+        else:
+            try:
+                return asyncio.run(coro)
+            except RuntimeError:
+                return coro
+
+    def start_background_task(self, target, *args, **kwargs):
+        if asyncio.iscoroutinefunction(target):
+            try:
+                loop = asyncio.get_running_loop()
+                return loop.create_task(target(*args, **kwargs))
+            except RuntimeError:
+                pass
+        thread = threading.Thread(target=target, args=args, kwargs=kwargs, daemon=True)
+        thread.start()
+        return thread
+
+    def test_client(self, app=None):
+        return SocketIOTestClient(self, app)
+
+
+socketio = AsyncSocketIOServer(
+    async_mode="asgi",
+    cors_allowed_origins="*",
+    max_http_buffer_size=MAX_ARCHIVE_BYTES + 1024 * 1024,
+)
+sio = socketio
 
 
 @dataclass
@@ -186,9 +277,9 @@ def _cleanup_expired_workspaces(now=None):
             except OSError:
                 logger.exception("Could not expire idle workspace %s", workspace_id)
                 continue
-            for sid, session in list(workspace_sessions.items()):
+            for sid_key, session in list(workspace_sessions.items()):
                 if session.workspace_id == workspace_id:
-                    workspace_sessions.pop(sid, None)
+                    workspace_sessions.pop(sid_key, None)
             workspace_last_access.pop(workspace_id, None)
             marker = STORAGE_DIR / ".workspace-activity" / workspace_id
             try:
@@ -225,11 +316,37 @@ def _cleanup_expired_workspaces(now=None):
 
 def _workspace_cleanup_loop():
     while True:
-        socketio.sleep(WORKSPACE_CLEANUP_INTERVAL_SECONDS)
+        time.sleep(WORKSPACE_CLEANUP_INTERVAL_SECONDS)
         try:
             _cleanup_expired_workspaces()
         except Exception:
             logger.exception("Workspace cleanup failed")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global _main_loop
+    _main_loop = asyncio.get_running_loop()
+    socketio.start_background_task(_workspace_cleanup_loop)
+    yield
+
+
+app = FastAPI(title="Nyxus Hybrid Backend", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
+
+
+asgi_app = python_socketio.ASGIApp(socketio, other_asgi_app=app)
 
 
 def _authorized(data):
@@ -412,15 +529,6 @@ def _run_agent_chat(
         if trace:
             socketio.emit("agent_trace", {"trace": trace}, to=sid)
         if readme_mode:
-@socketio.on("workspace_archive")
-def receive_workspace_archive(data):
-    if not isinstance(data, dict):
-        return {"ok": False, "error": "Invalid workspace archive request."}
-    if not _authorized(data):
-        return {"ok": False, "error": "Invalid API key."}
-
-    api_key = data.get("apiKey") or data.get("apikey")
-    result = None
             socketio.emit(
                 "readme_answer",
                 {"filename": "answer.md", "markdown": answer},
@@ -456,8 +564,14 @@ def receive_workspace_archive(data):
             _end_workspace_task(workspace_id)
 
 
+@socketio.on("connect")
+async def connect_client(sid, environ, auth=None):
+    logger.info("Client connected: %s", sid)
+    return True
+
+
 @socketio.on("workspace_archive")
-def receive_workspace_archive(data):
+def receive_workspace_archive(sid, data):
     if not isinstance(data, dict):
         return {"ok": False, "error": "Invalid workspace archive request."}
     if not _authorized(data):
@@ -484,7 +598,6 @@ def receive_workspace_archive(data):
             "error": "The server could not persist the workspace. Check MongoDB configuration and try again.",
         }
 
-    sid = request.sid
     _touch_workspace(result["workspace_id"])
     with _workspace_sessions_lock:
         previous = workspace_sessions.pop(sid, None)
@@ -501,7 +614,7 @@ def receive_workspace_archive(data):
 
 
 @socketio.on("workspace_resume")
-def resume_workspace(data):
+def resume_workspace(sid, data):
     if not isinstance(data, dict) or not _authorized(data):
         return {"ok": False, "error": "Invalid API key."}
     workspace_id = data.get("workspace_id")
@@ -509,7 +622,6 @@ def resume_workspace(data):
         return {"ok": False, "error": "A workspace id is required."}
 
     api_key = data.get("apiKey") or data.get("apikey")
-    sid = request.sid
     try:
         session = _activate_workspace(sid, workspace_id, api_key)
     except LookupError:
@@ -530,7 +642,7 @@ def resume_workspace(data):
 
 
 @socketio.on("chat")
-def receive_chat(data):
+def receive_chat(sid, data):
     if not isinstance(data, dict):
         return {"ok": False, "error": "Invalid chat request."}
     if not _authorized(data):
@@ -539,7 +651,6 @@ def receive_chat(data):
         return {"ok": False, "error": "Enter a message before sending."}
     if "readme_mode" in data and not isinstance(data["readme_mode"], bool):
         return {"ok": False, "error": "README mode must be a boolean."}
-    sid = request.sid
     api_key = data.get("apiKey") or data.get("apikey")
     workspace_id = data.get("workspace_id")
     if workspace_id is not None and not isinstance(workspace_id, str):
@@ -593,7 +704,7 @@ def receive_chat(data):
 
 
 @socketio.on("architecture_diagram_status")
-def architecture_diagram_status(data):
+def architecture_diagram_status(sid, data):
     if not isinstance(data, dict) or not _authorized(data):
         return {"ok": False, "error": "Invalid API key."}
     workspace_id = data.get("workspace_id")
@@ -601,7 +712,7 @@ def architecture_diagram_status(data):
     if status not in {"rendered", "failed"}:
         return {"ok": False, "error": "Invalid diagram rendering status."}
     if not _session_matches(
-        request.sid,
+        sid,
         workspace_id,
         data.get("apiKey") or data.get("apikey"),
     ):
@@ -617,7 +728,7 @@ def architecture_diagram_status(data):
         socketio.emit(
             "assistant_error",
             {"error": "The architecture HTML arrived, but VS Code could not render it. Check the Nyxus Replica output log."},
-            to=request.sid,
+            to=sid,
         )
     else:
         logger.info(
@@ -629,13 +740,11 @@ def architecture_diagram_status(data):
 
 
 @socketio.on("disconnect")
-def disconnect_workspace():
-    sid = request.sid
+def disconnect_workspace(sid, *args):
     with _workspace_sessions_lock:
         user_to_workspaceid.pop(sid, None)
         workspace_sessions.pop(sid, None)
 
 
 if __name__ == "__main__":
-    socketio.start_background_task(_workspace_cleanup_loop)
-    socketio.run(app, host=HOST, port=PORT, allow_unsafe_werkzeug=True)
+    uvicorn.run(asgi_app, host=HOST, port=PORT)
