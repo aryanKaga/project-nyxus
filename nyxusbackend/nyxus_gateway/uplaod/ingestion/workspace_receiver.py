@@ -112,19 +112,43 @@ if __name__ == "__main__":
     import sys
 
     parser = argparse.ArgumentParser(description="Unpack workspace archive")
-    parser.add_argument("--storage-root", required=True, help="Storage root directory")
+    parser.add_argument("--storage-root", default=None, help="Storage root directory")
     parser.add_argument("--workspace-id", default=None, help="Optional workspace ID")
     parser.add_argument("--archive-path", default=None, help="Path to archive zip file (reads stdin if omitted)")
     args = parser.parse_args()
+
+    storage_root = (
+        args.storage_root
+        or os.environ.get("STORAGE_DIR")
+        or str(Path(__file__).resolve().parent.parent.parent / "storage")
+    )
+    workspace_id = args.workspace_id
 
     try:
         if args.archive_path:
             with open(args.archive_path, "rb") as f:
                 archive_data = f.read()
         else:
-            archive_data = sys.stdin.buffer.read()
+            raw = sys.stdin.buffer.read()
+            # If input is JSON sent by ingest.js: {"archive": "<base64>"}
+            if raw.startswith(b"{"):
+                try:
+                    payload = json.loads(raw.decode("utf-8"))
+                    archive_val = payload.get("archive")
+                    if isinstance(archive_val, str):
+                        import base64
+                        archive_data = base64.b64decode(archive_val)
+                    else:
+                        archive_data = archive_val
+                    workspace_id = payload.get("workspace_id") or workspace_id
+                    if payload.get("storage_root"):
+                        storage_root = payload.get("storage_root")
+                except Exception:
+                    archive_data = raw
+            else:
+                archive_data = raw
 
-        res = unpack_workspace_archive(archive_data, args.storage_root, args.workspace_id)
+        res = unpack_workspace_archive(archive_data, storage_root, workspace_id)
         print(json.dumps({"ok": True, **res}))
     except ArchiveError as err:
         print(json.dumps({"ok": False, "error": str(err)}))
@@ -132,4 +156,5 @@ if __name__ == "__main__":
     except Exception as err:
         print(json.dumps({"ok": False, "error": str(err)}))
         sys.exit(2)
+
 
