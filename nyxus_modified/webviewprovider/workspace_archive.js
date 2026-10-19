@@ -8,27 +8,44 @@ const MAX_ARCHIVE_BYTES = 250 * 1024 * 1024;
 const MAX_GIT_OUTPUT_BYTES = 16 * 1024 * 1024;
 const DEFAULT_GITIGNORE = `# Dependencies
 node_modules/
+**/node_modules/
 vendor/
 venv/
 .venv/
 
 # Build output and caches
 dist/
+**/dist/
 build/
+**/build/
 out/
 coverage/
 .cache/
 __pycache__/
+.pytest_cache/
+.codegraph/
 
 # Local secrets and logs
 .env
 .env.*
 !.env.example
 *.log
+nyxus_auto_memory.txt
+.nyxus/
 
-# Operating system files
+# Database and media files
+*.sqlite
+*.sqlite3
+*.db
+*.mp4
+*.zip
+*.tar
+*.gz
+
+# Operating system and editor files
 .DS_Store
 Thumbs.db
+.vscode/
 `;
 
 async function resolveGitRoot(workspaceRoot) {
@@ -85,10 +102,14 @@ async function stageAndCommit(gitRoot) {
     return true;
 }
 
-async function listGitFiles(gitRoot) {
+async function listGitFiles(gitRoot, subPath = '') {
+    const args = ['-C', gitRoot, 'ls-tree', '-r', '--name-only', '-z', 'HEAD'];
+    if (subPath) {
+        args.push(subPath);
+    }
     const { stdout } = await execFileAsync(
         'git',
-        ['-C', gitRoot, 'ls-tree', '-r', '--name-only', '-z', 'HEAD'],
+        args,
         { encoding: 'buffer', maxBuffer: 256 * 1024 * 1024 }
     );
     return stdout.toString('utf8').split('\0').filter(Boolean);
@@ -96,13 +117,19 @@ async function listGitFiles(gitRoot) {
 
 async function create_workspace_archive(workspaceRoot) {
     const gitRoot = await resolveGitRoot(workspaceRoot);
+    const relativeSubPath = path.relative(gitRoot, workspaceRoot).replace(/\\/g, '/');
+
     await ensureGitIgnore(gitRoot);
     const commitCreated = await stageAndCommit(gitRoot);
-    const files = await listGitFiles(gitRoot);
+    const files = await listGitFiles(gitRoot, relativeSubPath);
 
     let archive;
     try {
-        const result = await execFileAsync('git', ['-C', gitRoot, 'archive', '--format=zip', 'HEAD'], {
+        const archiveArgs = ['-C', gitRoot, 'archive', '--format=zip', 'HEAD'];
+        if (relativeSubPath) {
+            archiveArgs.push(relativeSubPath);
+        }
+        const result = await execFileAsync('git', archiveArgs, {
             encoding: 'buffer',
             maxBuffer: MAX_ARCHIVE_BYTES
         });
@@ -118,7 +145,7 @@ async function create_workspace_archive(workspaceRoot) {
         archive,
         fileCount: files.length,
         commitCreated,
-        workspaceName: path.basename(gitRoot)
+        workspaceName: path.basename(workspaceRoot)
     };
 }
 
