@@ -102,6 +102,16 @@ async function stageAndCommit(gitRoot) {
     return true;
 }
 
+async function stageWorkspace(workspaceRoot) {
+    const gitRoot = await resolveGitRoot(workspaceRoot);
+    await execFileAsync('git', ['-C', gitRoot, 'add', '--all'], { maxBuffer: MAX_GIT_OUTPUT_BYTES });
+}
+
+async function unstageWorkspace(workspaceRoot) {
+    const gitRoot = await resolveGitRoot(workspaceRoot);
+    await execFileAsync('git', ['-C', gitRoot, 'reset', '--mixed', 'HEAD'], { maxBuffer: MAX_GIT_OUTPUT_BYTES });
+}
+
 async function listGitFiles(gitRoot, subPath = '') {
     const args = ['-C', gitRoot, 'ls-tree', '-r', '--name-only', '-z', 'HEAD'];
     if (subPath) {
@@ -149,4 +159,4 @@ async function create_workspace_archive(workspaceRoot) {
     };
 }
 
-module.exports = { create_workspace_archive, ensureGitIgnore, listGitFiles, stageAndCommit };
+module.exports = { create_workspace_archive, ensureGitIgnore, listGitFiles, stageAndCommit, stageWorkspace, unstageWorkspace };

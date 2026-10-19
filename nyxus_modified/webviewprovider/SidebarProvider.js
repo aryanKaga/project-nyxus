@@ -241,8 +241,39 @@ class SidebarProvider {
                 this.sendMessage({
                     type: 'workspace_info',
                     folderName,
-                    workspaceId
+                    workspaceId,
+                    hasApiKey: Boolean(await require('./api_key_storage').getApiKey(this.context))
                 });
+                return;
+            }
+
+            if (message.type === 'save_api_key') {
+                const apiKey = typeof message.apiKey === 'string' ? message.apiKey.trim() : '';
+                if (!apiKey) {
+                    this.sendMessage({ type: 'save_api_key_result', ok: false, error: 'Enter an API key to save.' });
+                    return;
+                }
+                try {
+                    await this.context.secrets.store('nyxusReplica.apiKey', apiKey);
+                    this.sendMessage({ type: 'save_api_key_result', ok: true });
+                    await this.reconnect();
+                } catch (error) {
+                    this.sendMessage({ type: 'save_api_key_result', ok: false, error: error instanceof Error ? error.message : String(error) });
+                }
+                return;
+            }
+
+            if (message.type === 'stage_workspace' || message.type === 'unstage_workspace') {
+                const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+                try {
+                    if (!workspaceRoot) throw new Error('Open a workspace folder first.');
+                    const { stageWorkspace, unstageWorkspace } = require('./workspace_archive');
+                    if (message.type === 'stage_workspace') await stageWorkspace(workspaceRoot);
+                    else await unstageWorkspace(workspaceRoot);
+                    this.sendMessage({ type: 'workspace_git_action_result', ok: true, action: message.type });
+                } catch (error) {
+                    this.sendMessage({ type: 'workspace_git_action_result', ok: false, action: message.type, error: error instanceof Error ? error.message : String(error) });
+                }
                 return;
             }
 

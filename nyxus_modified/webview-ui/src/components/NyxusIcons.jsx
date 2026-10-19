@@ -154,4 +154,16 @@ function RefreshIcon({ size = 14, className = "" }) {
   );
 }
 
-export { NyxusIcon, SendIcon, TypingDots, SettingsIcon, ChatIcon, RefreshIcon };
+function StageIcon({ size = 14 }) {
+  return <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" /></svg>;
+}
+
+function UnstageIcon({ size = 14 }) {
+  return <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 15V3" /><path d="m7 8 5-5 5 5" /><path d="M5 21h14" /></svg>;
+}
+
+function KeyIcon({ size = 14 }) {
+  return <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="5" /><path d="m11.5 11.5 9-9M17 6l2 2M14 9l2 2" /></svg>;
+}
+
+export { NyxusIcon, SendIcon, TypingDots, SettingsIcon, ChatIcon, RefreshIcon, StageIcon, UnstageIcon, KeyIcon };

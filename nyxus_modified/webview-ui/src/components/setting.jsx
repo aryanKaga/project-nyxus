@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { getVsCodeApi } from "./chat/vscodeApi";
-import { RefreshIcon } from "./NyxusIcons";
+import { RefreshIcon, StageIcon, UnstageIcon, KeyIcon } from "./NyxusIcons";
 import "./NyxusSettings.css";
 
 const vscode = getVsCodeApi();
@@ -9,8 +9,11 @@ export default function Setting({ onBack }) {
   const [workspaceInfo, setWorkspaceInfo] = useState({
     workspaceId: "",
     folderName: "",
+    hasApiKey: false,
   });
   const [loading, setLoading] = useState(false);
+  const [apiKey, setApiKey] = useState("");
+  const [gitActionLoading, setGitActionLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState({ type: "", text: "" });
 
   useEffect(() => {
@@ -23,6 +26,7 @@ export default function Setting({ onBack }) {
           setWorkspaceInfo({
             workspaceId: message.workspaceId || "",
             folderName: message.folderName || "",
+            hasApiKey: Boolean(message.hasApiKey),
           });
           break;
         case "assign_workspace_id_result":
@@ -47,6 +51,22 @@ export default function Setting({ onBack }) {
           setWorkspaceInfo((prev) => ({ ...prev, workspaceId: "" }));
           setStatusMsg({ type: "info", text: "Workspace ID cleared for this folder." });
           break;
+        case "save_api_key_result":
+          setLoading(false);
+          setStatusMsg(message.ok
+            ? { type: "success", text: "API key saved securely in VS Code." }
+            : { type: "error", text: message.error || "Could not save API key." });
+          if (message.ok) {
+            setApiKey("");
+            setWorkspaceInfo((prev) => ({ ...prev, hasApiKey: true }));
+          }
+          break;
+        case "workspace_git_action_result":
+          setGitActionLoading(false);
+          setStatusMsg(message.ok
+            ? { type: "success", text: message.action === "stage_workspace" ? "Workspace changes staged." : "Workspace changes unstaged; working files were preserved." }
+            : { type: "error", text: message.error || "Git action failed." });
+          break;
         default:
           break;
       }
@@ -70,6 +90,16 @@ export default function Setting({ onBack }) {
     if (window.confirm("Remove stored Workspace ID for this folder?")) {
       vscode.postMessage({ type: "clear_workspace_id" });
     }
+  };
+
+  const handleSaveApiKey = () => {
+    setLoading(true);
+    vscode.postMessage({ type: "save_api_key", apiKey });
+  };
+
+  const handleWorkspaceGitAction = (type) => {
+    setGitActionLoading(true);
+    vscode.postMessage({ type });
   };
 
   const copyToClipboard = (text) => {
@@ -108,6 +138,35 @@ export default function Setting({ onBack }) {
           </button>
         </div>
       )}
+
+      <div className="nyxus-settings-card">
+        <div className="nyxus-card-header">
+          <span className="nyxus-card-title">Nyxus API Key</span>
+          <span className={workspaceInfo.hasApiKey ? "nyxus-badge-active" : "nyxus-badge-missing"}>
+            {workspaceInfo.hasApiKey ? "Saved securely" : "Not set"}
+          </span>
+        </div>
+        <div className="nyxus-card-body">
+          <p className="nyxus-description">The key is stored in VS Code SecretStorage and is never shown after saving.</p>
+          <div className="nyxus-input-group">
+            <input type="password" autoComplete="new-password" className="nyxus-text-input" placeholder={workspaceInfo.hasApiKey ? "Enter a new key to replace the saved key" : "Enter API key"} value={apiKey} onChange={(event) => setApiKey(event.target.value)} />
+            <button type="button" className="nyxus-btn nyxus-btn-primary" disabled={loading || !apiKey.trim()} onClick={handleSaveApiKey}>
+              <KeyIcon /><span>Save Key</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="nyxus-settings-card">
+        <div className="nyxus-card-header"><span className="nyxus-card-title">Git Workspace</span></div>
+        <div className="nyxus-card-body">
+          <p className="nyxus-description">Stage all workspace changes, or unstage them while keeping your working files intact.</p>
+          <div className="nyxus-actions-row">
+            <button type="button" className="nyxus-btn nyxus-btn-primary" disabled={gitActionLoading} onClick={() => handleWorkspaceGitAction("stage_workspace")}><StageIcon /><span>Stage Workspace</span></button>
+            <button type="button" className="nyxus-btn nyxus-btn-ghost" disabled={gitActionLoading} onClick={() => handleWorkspaceGitAction("unstage_workspace")}><UnstageIcon /><span>Unstage Workspace</span></button>
+          </div>
+        </div>
+      </div>
 
       <div className="nyxus-settings-card">
         <div className="nyxus-card-header">
