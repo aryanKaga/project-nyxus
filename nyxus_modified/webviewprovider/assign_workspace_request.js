@@ -166,9 +166,102 @@ async function requestWorkspaceIdHttp(endpoint, payload, timeoutMs = DEFAULT_ASS
     throw new Error(errorMessage);
 }
 
+/**
+ * Deletes / unstages a workspace on the server via HTTP.
+ *
+ * @param {string | object} endpoint
+ * @param {object} payload
+ * @param {string} [payload.userId]
+ * @param {string} [payload.apiKey]
+ * @param {string} payload.workspaceId
+ * @param {string} [payload.serverUrl]
+ * @param {number} [timeoutMs]
+ * @returns {Promise<{ ok: boolean, message?: string }>}
+ */
+async function deleteWorkspaceHttp(endpoint, payload, timeoutMs = DEFAULT_ASSIGN_TIMEOUT_MS) {
+    const rawUrl = typeof endpoint === 'string' ? endpoint : (payload?.serverUrl || 'http://localhost:80');
+    const baseUrl = rawUrl.replace(/\/+$/, '');
+    const userId = payload?.userId || '123';
+    const apiKey = payload?.apiKey || '';
+    const workspaceId = payload?.workspaceId;
+
+    if (!workspaceId) {
+        throw new Error('No workspace ID to delete.');
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    const bodyData = JSON.stringify({
+        user_id: userId,
+        userId: userId,
+        api_key: apiKey,
+        apiKey: apiKey,
+        workspace_id: workspaceId,
+        workspaceId: workspaceId
+    });
+
+    const headers = {
+        'Content-Type': 'application/json',
+        'x-user-id': userId,
+        'x-api-key': apiKey
+    };
+
+    let response;
+    let rawText;
+    const url = `${baseUrl}/ID/delete_workspace`;
+    try {
+        response = await fetch(url, {
+            method: 'POST',
+            headers,
+            body: bodyData,
+            signal: controller.signal
+        });
+
+        if (response.status === 404) {
+            const fallbackUrl = `${baseUrl}/delete_workspace`;
+            response = await fetch(fallbackUrl, {
+                method: 'POST',
+                headers,
+                body: bodyData,
+                signal: controller.signal
+            });
+        }
+
+        rawText = await response.text();
+    } catch (error) {
+        if (controller.signal.aborted) {
+            throw new Error(`Delete workspace request timed out after ${Math.round(timeoutMs / 1000)}s.`);
+        }
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`Could not reach Nyxus server at ${url}: ${message}`);
+    } finally {
+        clearTimeout(timer);
+    }
+
+    let data;
+    try {
+        data = JSON.parse(rawText);
+    } catch {}
+
+    if (response.ok && (data?.ok === true || response.status === 200)) {
+        return {
+            ok: true,
+            message: data?.message || 'Workspace deleted successfully'
+        };
+    }
+
+    const errorMessage = typeof data?.error === 'string' && data.error.trim()
+        ? data.error.trim()
+        : `Server returned HTTP ${response.status}: ${rawText.slice(0, 150)}`;
+    throw new Error(errorMessage);
+}
+
 module.exports = {
     requestWorkspaceIdAssignment,
     requestWorkspaceIdHttp,
+    deleteWorkspaceHttp,
     ASSIGN_EVENT,
     DEFAULT_ASSIGN_TIMEOUT_MS
 };
+

@@ -116,6 +116,9 @@ export default function Setting({ onBack }) {
 
         case "workspace_git_action_result":
           setLoading(false);
+          if (message.ok && message.action === "unstage_workspace") {
+            vscode.postMessage({ type: "get_workspace_info" });
+          }
           setStatusMsg(message.ok
             ? { type: "success", text: message.action === "stage_workspace" ? "Workspace staged." : "Workspace unstaged." }
             : { type: "error", text: message.error || "Workspace staging failed." });
