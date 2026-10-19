@@ -1,7 +1,7 @@
 import express from "express";
 import { unpackWorkspaceWithPython } from "./ingestion/ingest.js";
 
-import getMongoStore from "./MongoStore.js";
+import getMongoStore from "../MongoStore.js";
 
 
 
