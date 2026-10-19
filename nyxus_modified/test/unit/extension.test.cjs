@@ -5,12 +5,16 @@ const { after, test } = require('node:test');
 
 const originalLoad = Module._load;
 const registeredCommands = new Map();
-let registeredView;
+const registeredViews = new Map();
 let notification;
 let providerLoadCount = 0;
 let providerResolveCount = 0;
 let createdProvider;
 let providerDisposed = false;
+
+let settingsLoadCount = 0;
+let settingsResolveCount = 0;
+let settingsDisposed = false;
 
 Module._load = function (request, parent, isMain) {
     if (request === 'vscode') {
@@ -32,7 +36,7 @@ Module._load = function (request, parent, isMain) {
                     };
                 },
                 registerWebviewViewProvider(viewId, provider) {
-                    registeredView = { viewId, provider };
+                    registeredViews.set(viewId, provider);
                     return { dispose() {} };
                 },
                 showInformationMessage(message) {
@@ -60,6 +64,20 @@ Module._load = function (request, parent, isMain) {
             }
         };
     }
+    if (request === './webviewprovider/SettingsViewProvider') {
+        settingsLoadCount += 1;
+        return {
+            SettingsViewProvider: class {
+                resolveWebviewView() {
+                    settingsResolveCount += 1;
+                }
+
+                dispose() {
+                    settingsDisposed = true;
+                }
+            }
+        };
+    }
     return originalLoad.call(this, request, parent, isMain);
 };
 
@@ -69,7 +87,7 @@ after(() => {
 
 const extension = require('../../extension');
 
-test('keeps extension activation lightweight and loads the sidebar on demand', async () => {
+test('keeps extension activation lightweight and loads the sidebar and settings on demand', async () => {
     const subscriptions = [];
 
     extension.activate({
@@ -77,16 +95,19 @@ test('keeps extension activation lightweight and loads the sidebar on demand', a
         extensionUri: { fsPath: path.resolve(__dirname, '../..') }
     });
 
-    assert.equal(subscriptions.length, 5);
+    assert.equal(subscriptions.length, 7);
     assert.equal(providerLoadCount, 0);
+    assert.equal(settingsLoadCount, 0);
     assert.ok(registeredCommands.has('nyxusReplica.sayHi'));
     assert.ok(registeredCommands.has('nyxusReplica.openSidebar'));
-    assert.equal(registeredView.viewId, 'nyxusReplica.sidebar');
+    assert.ok(registeredCommands.has('nyxusReplica.openSettings'));
+    assert.ok(registeredViews.has('nyxusReplica.sidebar'));
+    assert.ok(registeredViews.has('nyxusReplica.settings'));
 
     let renderedHtml = '';
     let webviewOptions;
     let disposeHandler;
-    registeredView.provider.resolveWebviewView({
+    registeredViews.get('nyxusReplica.sidebar').resolveWebviewView({
         webview: {
             set options(value) {
                 webviewOptions = value;
@@ -104,18 +125,41 @@ test('keeps extension activation lightweight and loads the sidebar on demand', a
     assert.match(renderedHtml, /Starting Nyxus/);
     assert.equal(providerLoadCount, 0);
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    let settingsHtml = '';
+    registeredViews.get('nyxusReplica.settings').resolveWebviewView({
+        webview: {
+            set options(value) {},
+            set html(value) {
+                settingsHtml = value;
+            }
+        },
+        onDidDispose() {}
+    });
+
+    assert.match(settingsHtml, /Starting Nyxus Settings/);
+    assert.equal(settingsLoadCount, 0);
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
 
     assert.equal(providerLoadCount, 1);
     assert.equal(providerResolveCount, 1);
+    assert.equal(settingsLoadCount, 1);
+    assert.equal(settingsResolveCount, 1);
     assert.ok(createdProvider);
     assert.equal(typeof disposeHandler, 'function');
-    subscriptions[4].dispose();
+
+    // Trigger cleanup
+    subscriptions[6].dispose();
     assert.equal(providerDisposed, true);
+    assert.equal(settingsDisposed, true);
 });
 
 test('shows a greeting notification when the command runs', async () => {
     await registeredCommands.get('nyxusReplica.sayHi')();
 
     assert.equal(notification, 'Hi from the Nyxus test extension!');
+});
+
+test('executes openSettings command without error', async () => {
+    await registeredCommands.get('nyxusReplica.openSettings')();
 });

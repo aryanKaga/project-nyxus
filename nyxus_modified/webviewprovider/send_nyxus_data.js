@@ -20,6 +20,9 @@ async function send_workspace_data(logFlow, workspaceData) {
 
     const uploadUrl = config.get('url') + '/upload';
 
+    const userId = config.get('userId') || '8f2c6e91-4a73-4db8-9c15-2e6b7a0d3f84';
+    const workspaceId = workspaceData?.workspace_id || workspaceData?.workspaceId || '8f2c6e91-4a73-4db8-9c15-2e6b7a0d3f84';
+
     logFlow('request.workspace_archive');
 
     const controller = new AbortController();
@@ -32,9 +35,9 @@ async function send_workspace_data(logFlow, workspaceData) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                user_id:"8f2c6e91-4a73-4db8-9c15-2e6b7a0d3f84",/**this is only for testing pupose remove it in production scenarios */
+                user_id: userId,
                 api_key: apiKey,
-                workspace_id: "8f2c6e91-4a73-4db8-9c15-2e6b7a0d3f84",
+                workspace_id: workspaceId,
                 archive: workspaceData.archive.toString('base64')
             }),
             signal: controller.signal

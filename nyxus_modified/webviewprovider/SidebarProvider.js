@@ -6,6 +6,7 @@ const { create_workspace_archive } = require('./workspace_archive');
 const { send_workspace_data } = require('./send_nyxus_data');
 const { createWebSocket } = require('./create_websocket');
 const { createFlowLogger } = require('./flowLogger');
+const { getStoredWorkspaceId } = require('./workspace_storage');
 
 
 class SidebarProvider {
@@ -14,6 +15,7 @@ class SidebarProvider {
      * @param {import('vscode').OutputChannel} output
      */
     constructor(context, output) {
+        this.context = context;
         this.extensionUri = context.extensionUri;
         this.output = output;
         /** @type {import('vscode').WebviewView | undefined} */
@@ -118,11 +120,14 @@ class SidebarProvider {
 
         this.sendingWorkspaceData = true;
         try {
+            const folderUri = vscode.workspace.workspaceFolders?.[0]?.uri;
+            const storedWorkspaceId = folderUri && this.context ? getStoredWorkspaceId(this.context, folderUri) : undefined;
+
             const result = await send_workspace_data(this.logFlow.bind(this), {
                 archive: this.workspaceArchive,
                 fileCount: this.workspaceFileCount,
                 workspaceName: this.workspaceName,
-                workspace_id:123
+                workspace_id: storedWorkspaceId
             });
             this.workspaceDataSent = true;
             this.workspaceStatus = {
@@ -216,6 +221,11 @@ class SidebarProvider {
         webview.onDidReceiveMessage(async (message) => {
             if (!message || typeof message !== 'object') {
                 this.logFlow('webview.message.invalid');
+                return;
+            }
+
+            if (message.type === 'open_settings') {
+                vscode.commands.executeCommand('nyxusReplica.openSettings');
                 return;
             }
 

@@ -1,0 +1,279 @@
+.nyxus-settings-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100vh;
+  overflow-y: auto;
+  background: var(--nyxus-bg, #0d0d12);
+  color: var(--nyxus-text, #e8e6f0);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  padding: 16px;
+  gap: 16px;
+  box-sizing: border-box;
+}
+
+.nyxus-settings-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-bottom: 1px solid var(--nyxus-border, rgba(255, 255, 255, 0.08));
+  padding-bottom: 12px;
+}
+
+.nyxus-settings-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--nyxus-text, #e8e6f0);
+}
+
+.nyxus-settings-sub {
+  font-size: 12px;
+  color: var(--nyxus-text-muted, rgba(232, 230, 240, 0.55));
+  margin: 0;
+  line-height: 1.4;
+}
+
+.nyxus-settings-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.nyxus-settings-banner.success {
+  background: rgba(0, 255, 136, 0.12);
+  border: 1px solid rgba(0, 255, 136, 0.3);
+  color: #00ff88;
+}
+
+.nyxus-settings-banner.error {
+  background: rgba(255, 107, 107, 0.12);
+  border: 1px solid rgba(255, 107, 107, 0.3);
+  color: #ff6b6b;
+}
+
+.nyxus-settings-banner.info {
+  background: rgba(124, 106, 247, 0.12);
+  border: 1px solid rgba(124, 106, 247, 0.3);
+  color: #9d8fff;
+}
+
+.nyxus-banner-close {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0 4px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.nyxus-banner-close:hover {
+  opacity: 1;
+}
+
+.nyxus-settings-card {
+  background: var(--nyxus-surface, #13131a);
+  border: 1px solid var(--nyxus-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--nyxus-radius, 12px);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nyxus-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.nyxus-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--nyxus-text-muted, rgba(232, 230, 240, 0.7));
+}
+
+.nyxus-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nyxus-folder-badge {
+  font-size: 11px;
+  background: var(--nyxus-surface-2, #1a1a24);
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--nyxus-border, rgba(255, 255, 255, 0.08));
+  color: var(--nyxus-text, #e8e6f0);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nyxus-badge-active {
+  font-size: 11px;
+  background: rgba(0, 255, 136, 0.15);
+  color: #00ff88;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 255, 136, 0.3);
+  font-weight: 500;
+}
+
+.nyxus-badge-missing {
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--nyxus-text-muted, rgba(232, 230, 240, 0.5));
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--nyxus-border, rgba(255, 255, 255, 0.08));
+}
+
+.nyxus-field-label {
+  font-size: 11px;
+  color: var(--nyxus-text-muted, rgba(232, 230, 240, 0.6));
+}
+
+.nyxus-code-box {
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 11px;
+  background: var(--nyxus-surface-2, #1a1a24);
+  border: 1px solid var(--nyxus-border, rgba(255, 255, 255, 0.08));
+  padding: 6px 10px;
+  border-radius: 6px;
+  word-break: break-all;
+  color: var(--nyxus-text, #e8e6f0);
+}
+
+.nyxus-description {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--nyxus-text-muted, rgba(232, 230, 240, 0.65));
+  margin: 0;
+}
+
+.nyxus-input-group {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.nyxus-text-input {
+  flex: 1;
+  background: var(--nyxus-surface-2, #1a1a24);
+  border: 1px solid var(--nyxus-border, rgba(255, 255, 255, 0.08));
+  border-radius: 6px;
+  color: var(--nyxus-text, #e8e6f0);
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  padding: 6px 10px;
+  outline: none;
+}
+
+.nyxus-text-input:focus {
+  border-color: var(--nyxus-accent, #7c6af7);
+}
+
+.nyxus-actions-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.nyxus-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.nyxus-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.nyxus-btn-primary {
+  background: var(--nyxus-accent, #7c6af7);
+  color: white;
+}
+
+.nyxus-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.nyxus-btn-ghost {
+  background: var(--nyxus-surface-2, #1a1a24);
+  border: 1px solid var(--nyxus-border, rgba(255, 255, 255, 0.08));
+  color: var(--nyxus-text, #e8e6f0);
+}
+
+.nyxus-btn-ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.nyxus-btn-danger {
+  background: rgba(255, 107, 107, 0.15);
+  border: 1px solid rgba(255, 107, 107, 0.3);
+  color: #ff6b6b;
+}
+
+.nyxus-btn-danger:hover:not(:disabled) {
+  background: rgba(255, 107, 107, 0.25);
+}
+
+.nyxus-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.nyxus-meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  gap: 8px;
+}
+
+.nyxus-meta-label {
+  color: var(--nyxus-text-muted, rgba(232, 230, 240, 0.6));
+}
+
+.nyxus-meta-val {
+  font-family: Consolas, "Courier New", monospace;
+  color: var(--nyxus-text, #e8e6f0);
+}
+
+.nyxus-truncate {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
