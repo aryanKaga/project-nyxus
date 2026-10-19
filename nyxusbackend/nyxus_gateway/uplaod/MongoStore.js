@@ -83,6 +83,7 @@ export class MongoStore {
   }
 
   async saveWorkspace(apiKey, workspaceId, archive, fileCount) {
+    console.log('trying to save the data')
     const identity = userKey(apiKey);
     await this._prepare();
 
@@ -91,6 +92,7 @@ export class MongoStore {
       `${workspaceId}.zip`,
       { metadata: { workspace_id: workspaceId, user_id: identity } }
     );
+    
     await pipeline(Readable.from([Buffer.from(archive)]), uploadStream);
     const archiveId = uploadStream.id;
 

@@ -38,18 +38,18 @@ const handleWorkspaceUpload = async (req, res) => {
 
 
 const handleWorkspaceUpload = async (req, res) => {
-    console.log('reached upload endpoint')
+    console.log('reached upload endpoint with workspace_id ',req.workspace_id)
     try {
         
-        /**const {user_id,api_key,workspace_id} = req.body
+        const {user_id,api_key,workspace_id} = req.body
         if(!user_id || !api_key || !workspace_id){
             return res.status(401).json({
                 error:"invalid credentials"
             })
         }
-        */
+        
         const archive = getArchivePayload(req);
-        console.log('got archive payload',archive)
+        
         if (!archive) {
             return res.status(400).json({
                 ok: false,

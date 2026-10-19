@@ -1,0 +1,52 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Editor / IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Build / distribution artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Logs and test outputs
+*.log
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Scraped data & output dumps
+**/data.json
+data.json
+*.html
+*.jsonl
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# OS files
+.DS_Store
+Thumbs.db
