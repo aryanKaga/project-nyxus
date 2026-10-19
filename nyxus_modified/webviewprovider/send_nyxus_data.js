@@ -1,6 +1,5 @@
 const vscode = require('vscode');
-const config = vscode.workspace.getConfiguration();
-const UPLOAD_URL = config.get('url')+'/upload'
+
 const UPLOAD_TIMEOUT_MS = 120000;
 
 /**
@@ -13,10 +12,13 @@ async function send_workspace_data(logFlow, workspaceData) {
         throw new Error('The workspace archive has not been prepared.');
     }
 
-    const apiKey = vscode.workspace.getConfiguration('nyxusReplica').get('apiKey');
+    const config = vscode.workspace.getConfiguration('nyxusReplica');
+    const apiKey = config.get('apiKey');
     if (!apiKey) {
         throw new Error('apiKey not configured');
     }
+
+    const uploadUrl = config.get('url') + '/upload';
 
     logFlow('request.workspace_archive');
 
@@ -26,7 +28,7 @@ async function send_workspace_data(logFlow, workspaceData) {
     let response;
     let rawBody;
     try {
-        response = await fetch(UPLOAD_URL, {
+        response = await fetch(uploadUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -37,7 +39,6 @@ async function send_workspace_data(logFlow, workspaceData) {
             signal: controller.signal
         });
         rawBody = await response.text();
-        console.log(rawBody)
     } catch (error) {
         if (controller.signal.aborted) {
             throw new Error('The server did not acknowledge the workspace archive in time.');

@@ -118,7 +118,7 @@ class SidebarProvider {
 
         this.sendingWorkspaceData = true;
         try {
-            const result = await send_workspace_data(this.socket, this.logFlow.bind(this), {
+            const result = await send_workspace_data(this.logFlow.bind(this), {
                 archive: this.workspaceArchive,
                 fileCount: this.workspaceFileCount,
                 workspaceName: this.workspaceName
@@ -189,6 +189,9 @@ class SidebarProvider {
              */
             this.socket?.disconnect();
             this.workspaceDataSent = false;
+            this.workspacePromise = undefined;
+            this.workspaceReady = false;
+            this.workspaceArchive = undefined;
             this.socket = createWebSocket(webview, this.logFlow.bind(this));
             /**
              * sends nyxus data every time the user connects to the server, bad point because if the 

@@ -1,1 +1,1 @@
-**Error:** Nyxus is not connected. Check the server URL and try again.
+Workspace upload failed: Workspace archive exceeds the 250 MB server limit.

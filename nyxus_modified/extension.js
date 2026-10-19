@@ -32,7 +32,11 @@ function activate(context) {
                 } catch (error) {
                     const detail = error instanceof Error ? error.message : String(error);
                     output.appendLine(`Nyxus sidebar initialization failed: ${detail}`);
-                    webview.html = '<!DOCTYPE html><html><body><p>Nyxus could not start. See the Nyxus Replica output channel.</p></body></html>';
+                    try {
+                        webview.html = '<!DOCTYPE html><html><body><p>Nyxus could not start. See the Nyxus Replica output channel.</p></body></html>';
+                    } catch {
+                        // webview was disposed before we could update it — nothing to do
+                    }
                 }
             }, 0);
 

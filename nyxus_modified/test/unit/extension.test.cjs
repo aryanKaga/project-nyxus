@@ -100,7 +100,7 @@ test('keeps extension activation lightweight and loads the sidebar on demand', a
         }
     });
 
-    assert.equal(webviewOptions.enableScripts, false);
+    assert.equal(webviewOptions, undefined);
     assert.match(renderedHtml, /Starting Nyxus/);
     assert.equal(providerLoadCount, 0);
 
