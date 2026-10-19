@@ -7,6 +7,7 @@ const id_router = express.Router();
 const users = db.collection("users");
 
 async function assign_workspace_id(user_id) {
+    console.log('request came for generate a workspae id by ',user_id)
     try {
         const assign_id = randomUUID();
 
@@ -31,6 +32,7 @@ async function assign_workspace_id(user_id) {
 }
 
 id_router.post("/request_id", async (req, res) => {
+    console.log('request came for generating a workspace ids')
     try {
         // Assumes authentication middleware sets req.user
         const user_id = req.user?.user_id;

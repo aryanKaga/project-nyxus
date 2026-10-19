@@ -101,6 +101,7 @@ async function requestWorkspaceIdAssignment(endpointOrSocket, payload, timeoutMs
 async function requestWorkspaceIdHttp(endpoint, payload, timeoutMs = DEFAULT_ASSIGN_TIMEOUT_MS) {
     const rawUrl = typeof endpoint === 'string' ? endpoint : (payload?.serverUrl || 'http://localhost:80');
     const baseUrl = rawUrl.replace(/\/+$/, '');
+    console.log(rawUrl)
     const url = `${baseUrl}/ID/request_id`;
     const userId = payload?.userId || '123';
     const apiKey = payload?.apiKey || '';
