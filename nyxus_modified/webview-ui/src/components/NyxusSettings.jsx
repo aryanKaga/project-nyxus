@@ -157,7 +157,7 @@ export default function NyxusSettings() {
             )}
           </div>
 
-          <div className="nyxus-actions-row">
+          {!workspaceInfo.workspaceId && <div className="nyxus-actions-row">
             <button
               type="button"
               className="nyxus-btn nyxus-btn-primary"
@@ -169,24 +169,11 @@ export default function NyxusSettings() {
                   <RefreshIcon className="nyxus-spin" size={14} />
                   <span>Assigning...</span>
                 </>
-              ) : workspaceInfo.workspaceId ? (
-                "Reassign / Refresh ID"
               ) : (
                 "Request Workspace ID"
               )}
             </button>
-
-            {workspaceInfo.workspaceId && (
-              <button
-                type="button"
-                className="nyxus-btn nyxus-btn-danger"
-                onClick={handleClearWorkspaceId}
-                disabled={loading}
-              >
-                Clear
-              </button>
-            )}
-          </div>
+          </div>}
         </div>
       </div>
 

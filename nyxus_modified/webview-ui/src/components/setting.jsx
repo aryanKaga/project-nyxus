@@ -294,7 +294,7 @@ export default function Setting({ onBack }) {
           </button>
         </div>
 
-        {activeTab === "workspace" && (
+        {activeTab === "workspace" && !workspaceInfo.workspaceId && (
           <button
             type="button"
             className="vscode-settings-primary-btn"
@@ -307,8 +307,6 @@ export default function Setting({ onBack }) {
                 <RefreshIcon className="nyxus-spin" size={13} />
                 <span>Requesting...</span>
               </>
-            ) : workspaceInfo.workspaceId ? (
-              "Workspace ID Assigned"
             ) : (
               "Request Workspace ID"
             )}
@@ -414,10 +412,10 @@ export default function Setting({ onBack }) {
                   </div>
 
                   <div className="vscode-setting-actions">
-                    <button
+                    {!workspaceInfo.workspaceId && <button
                       type="button"
                       className="vscode-settings-primary-btn"
-                      disabled={loading || Boolean(workspaceInfo.workspaceId)}
+                      disabled={loading}
                       onClick={handleRequestWorkspaceId}
                     >
                       {loading ? (
@@ -425,12 +423,10 @@ export default function Setting({ onBack }) {
                           <RefreshIcon className="nyxus-spin" size={13} />
                           <span>Requesting Workspace ID...</span>
                         </>
-                      ) : workspaceInfo.workspaceId ? (
-                        "Workspace ID Assigned"
                       ) : (
                         "Request Workspace ID"
                       )}
-                    </button>
+                    </button>}
 
                   </div>
                   <div className="vscode-setting-actions">
