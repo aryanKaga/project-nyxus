@@ -14,6 +14,7 @@ export default function Setting({ onBack }) {
     description: "",
     apiKey: "",
     hasApiKey: false,
+    userId: "",
   });
 
   const [customNameInput, setCustomNameInput] = useState("");
@@ -42,6 +43,7 @@ export default function Setting({ onBack }) {
             description: message.description || "",
             apiKey: message.apiKey || "",
             hasApiKey: Boolean(message.hasApiKey),
+            userId: message.userId || message.user_id || "",
           });
           setCustomNameInput(message.customName || message.folderName || "");
           setDescriptionInput(message.description || "");
@@ -605,6 +607,41 @@ export default function Setting({ onBack }) {
                       </div>
                     </form>
                   )}
+                </div>
+              )}
+
+              {/* User ID Setting */}
+              {matchesSearch("User ID static identifier authentication") && (
+                <div className="vscode-setting-item">
+                  <div className="vscode-setting-title">
+                    Nyxus › User: <span className="highlight">User ID</span>
+                  </div>
+                  <div className="vscode-setting-description">
+                    Static identifier used to authenticate requests with the Nyxus server. This value
+                    is managed by the extension and cannot be changed.
+                  </div>
+
+                  <div className="vscode-setting-control-row">
+                    <input
+                      type="text"
+                      readOnly
+                      className="vscode-setting-text-box vscode-setting-key-preview"
+                      value={workspaceInfo.userId || "123"}
+                      placeholder="Loading..."
+                    />
+                    <button
+                      type="button"
+                      className="vscode-setting-action-btn"
+                      onClick={() => copyToClipboard(workspaceInfo.userId || "123")}
+                      title="Copy User ID"
+                    >
+                      Copy
+                    </button>
+                  </div>
+
+                  <div className="vscode-setting-description" style={{ marginTop: 4, fontStyle: "italic" }}>
+                    Read-only — managed by the extension.
+                  </div>
                 </div>
               )}
             </>
