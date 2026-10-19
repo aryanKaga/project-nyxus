@@ -3,6 +3,7 @@ import { createClient } from "redis";
 
 import dotenv from "dotenv";
 import uploadRouter from "./uplaod/workspace_upload.js";
+import id_router from "./workspace_id/workspace_id.js";
 import {client ,init_database}from './MonogoClient.js'
 dotenv.config();
 
@@ -79,7 +80,7 @@ const authenticate = async (req, res, next) => {
 
 // Mount the workspace upload router under /upload, /workspace, and /uplaod
 app.use("/upload", uploadRouter);
-app.use("/workspace", uploadRouter);
+app.use("/ID",id_router)
 
 
 const port = process.env.PORT || 3000;

@@ -20,6 +20,7 @@ export default function Setting({ onBack }) {
   const [descriptionInput, setDescriptionInput] = useState("");
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
+  const [isConfiguringApiKey, setIsConfiguringApiKey] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState({ type: "", text: "" });
@@ -91,11 +92,13 @@ export default function Setting({ onBack }) {
               type: "success",
               text: "API key saved successfully.",
             });
+            const updatedKey = message.apiKey !== undefined ? message.apiKey : apiKeyInput.trim();
             setWorkspaceInfo((prev) => ({
               ...prev,
-              apiKey: message.apiKey || prev.apiKey,
-              hasApiKey: true,
+              apiKey: updatedKey,
+              hasApiKey: Boolean(updatedKey),
             }));
+            setIsConfiguringApiKey(false);
           } else {
             setStatusMsg({
               type: "error",
@@ -139,10 +142,28 @@ export default function Setting({ onBack }) {
 
   const handleSaveApiKey = (e) => {
     e?.preventDefault();
+    if (!apiKeyInput.trim()) {
+      setStatusMsg({ type: "error", text: "Please enter a valid API key." });
+      return;
+    }
+    setStatusMsg({ type: "info", text: "Saving API key..." });
     vscode.postMessage({
       type: "save_api_key",
-      apiKey: apiKeyInput,
+      apiKey: apiKeyInput.trim(),
     });
+  };
+
+  const handleClearApiKey = () => {
+    if (window.confirm("Remove stored API key?")) {
+      vscode.postMessage({
+        type: "save_api_key",
+        apiKey: "",
+      });
+      setApiKeyInput("");
+      setWorkspaceInfo((prev) => ({ ...prev, apiKey: "", hasApiKey: false }));
+      setIsConfiguringApiKey(false);
+      setStatusMsg({ type: "info", text: "API key removed." });
+    }
   };
 
   const handleClearWorkspaceId = () => {
@@ -177,7 +198,18 @@ export default function Setting({ onBack }) {
               ← Chat
             </button>
           )}
-          <span className="vscode-settings-title">Settings</span>
+          <div className="vscode-settings-header-label">
+            <svg
+              className="vscode-settings-gear-icon"
+              viewBox="0 0 16 16"
+              width="14"
+              height="14"
+              fill="currentColor"
+            >
+              <path d="M9.1 4.4L8.6 2H7.4l-.5 2.4-.7.3-2-1.3-.9.8 1.3 2-.2.7-2.5.5v1.2l2.5.5.3.8-1.4 1.9.8.8 2-1.4.7.3.5 2.4h1.2l.5-2.4.8-.3 1.9 1.4.8-.8-1.4-2 .3-.7 2.4-.5V7.6l-2.4-.5-.3-.7 1.4-2-.8-.8-2 1.3-.7-.3zM8 10c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z" />
+            </svg>
+            <span className="vscode-settings-title">Settings</span>
+          </div>
         </div>
       </div>
 
@@ -214,6 +246,16 @@ export default function Setting({ onBack }) {
               ✕
             </button>
           )}
+          <svg
+            className="vscode-settings-filter-icon"
+            viewBox="0 0 16 16"
+            width="14"
+            height="14"
+            fill="currentColor"
+            title="Filter settings"
+          >
+            <path d="M6 12h4v1H6v-1zm-2-4h8v1H4V8zm-2-4h12v1H2V4z" />
+          </svg>
         </div>
       </div>
 
@@ -222,17 +264,17 @@ export default function Setting({ onBack }) {
         <div className="vscode-settings-tabs">
           <button
             type="button"
-            className={`vscode-settings-tab ${activeTab === "workspace" ? "active" : ""}`}
-            onClick={() => setActiveTab("workspace")}
-          >
-            Workspace
-          </button>
-          <button
-            type="button"
             className={`vscode-settings-tab ${activeTab === "user" ? "active" : ""}`}
             onClick={() => setActiveTab("user")}
           >
             User
+          </button>
+          <button
+            type="button"
+            className={`vscode-settings-tab ${activeTab === "workspace" ? "active" : ""}`}
+            onClick={() => setActiveTab("workspace")}
+          >
+            Workspace
           </button>
         </div>
 
@@ -255,6 +297,31 @@ export default function Setting({ onBack }) {
               "Request Workspace ID"
             )}
           </button>
+        )}
+
+        {activeTab === "user" && (
+          isConfiguringApiKey ? (
+            <button
+              type="button"
+              className="vscode-settings-primary-btn"
+              onClick={handleSaveApiKey}
+              title="Save Nyxus API Key"
+            >
+              Save API Key
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="vscode-settings-primary-btn"
+              onClick={() => {
+                setApiKeyInput(workspaceInfo.apiKey || "");
+                setIsConfiguringApiKey(true);
+              }}
+              title="Configure Nyxus API Key"
+            >
+              Configure API Key
+            </button>
+          )
         )}
       </div>
 
@@ -280,12 +347,14 @@ export default function Setting({ onBack }) {
             className={`vscode-settings-nav-item ${activeTab === "workspace" ? "selected" : ""}`}
             onClick={() => setActiveTab("workspace")}
           >
+            <span className="vscode-settings-nav-arrow">›</span>
             <span className="vscode-settings-nav-label">Workspace</span>
           </div>
           <div
             className={`vscode-settings-nav-item ${activeTab === "user" ? "selected" : ""}`}
             onClick={() => setActiveTab("user")}
           >
+            <span className="vscode-settings-nav-arrow">›</span>
             <span className="vscode-settings-nav-label">API Key & User</span>
           </div>
         </aside>
@@ -421,7 +490,7 @@ export default function Setting({ onBack }) {
           {activeTab === "user" && (
             <>
               {/* API Key Setting */}
-              {matchesSearch("API Key authentication") && (
+              {matchesSearch("API Key authentication token user") && (
                 <div className="vscode-setting-item">
                   <div className="vscode-setting-title">
                     Nyxus › User: <span className="highlight">API Key</span>
@@ -430,33 +499,112 @@ export default function Setting({ onBack }) {
                     API key used to authenticate and identify this Nyxus client with the server.
                   </div>
 
-                  <div className="vscode-setting-control-row">
-                    <input
-                      type={showApiKey ? "text" : "password"}
-                      className="vscode-setting-text-box"
-                      placeholder="Enter Nyxus API Key"
-                      value={apiKeyInput}
-                      onChange={(e) => setApiKeyInput(e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      className="vscode-setting-action-btn"
-                      onClick={() => setShowApiKey(!showApiKey)}
-                      title={showApiKey ? "Hide key" : "Show key"}
-                    >
-                      {showApiKey ? "Hide" : "Show"}
-                    </button>
-                  </div>
+                  {!isConfiguringApiKey ? (
+                    <div className="vscode-setting-key-view">
+                      <div className="vscode-setting-control-row">
+                        <input
+                          type="text"
+                          readOnly
+                          className="vscode-setting-text-box vscode-setting-key-preview"
+                          placeholder="No API key configured"
+                          value={
+                            workspaceInfo.apiKey
+                              ? showApiKey
+                                ? workspaceInfo.apiKey
+                                : "••••••••••••••••••••••••••••••••"
+                              : workspaceInfo.hasApiKey
+                              ? "••••••••••••••••"
+                              : ""
+                          }
+                        />
+                        {workspaceInfo.apiKey ? (
+                          <>
+                            <button
+                              type="button"
+                              className="vscode-setting-action-btn"
+                              onClick={() => setShowApiKey(!showApiKey)}
+                              title={showApiKey ? "Hide API key" : "Show API key"}
+                            >
+                              {showApiKey ? "Hide" : "Show"}
+                            </button>
+                            <button
+                              type="button"
+                              className="vscode-setting-action-btn"
+                              onClick={() => copyToClipboard(workspaceInfo.apiKey)}
+                              title="Copy API key"
+                            >
+                              Copy
+                            </button>
+                          </>
+                        ) : null}
+                      </div>
 
-                  <div className="vscode-setting-actions">
-                    <button
-                      type="button"
-                      className="vscode-settings-primary-btn"
-                      onClick={handleSaveApiKey}
-                    >
-                      Save API Key
-                    </button>
-                  </div>
+                      <div className="vscode-setting-actions">
+                        <button
+                          type="button"
+                          className="vscode-settings-primary-btn"
+                          onClick={() => {
+                            setApiKeyInput(workspaceInfo.apiKey || "");
+                            setIsConfiguringApiKey(true);
+                          }}
+                        >
+                          {workspaceInfo.apiKey || workspaceInfo.hasApiKey
+                            ? "Configure API Key"
+                            : "Set API Key"}
+                        </button>
+                        {(workspaceInfo.apiKey || workspaceInfo.hasApiKey) && (
+                          <button
+                            type="button"
+                            className="vscode-setting-danger-btn"
+                            onClick={handleClearApiKey}
+                            title="Remove stored API key"
+                          >
+                            Remove Key
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleSaveApiKey} className="vscode-setting-key-edit">
+                      <div className="vscode-setting-control-row">
+                        <input
+                          type={showApiKey ? "text" : "password"}
+                          className="vscode-setting-text-box"
+                          placeholder="Enter Nyxus API Key"
+                          value={apiKeyInput}
+                          onChange={(e) => setApiKeyInput(e.target.value)}
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          className="vscode-setting-action-btn"
+                          onClick={() => setShowApiKey(!showApiKey)}
+                          title={showApiKey ? "Hide key" : "Show key"}
+                        >
+                          {showApiKey ? "Hide" : "Show"}
+                        </button>
+                      </div>
+
+                      <div className="vscode-setting-actions">
+                        <button
+                          type="submit"
+                          className="vscode-settings-primary-btn"
+                        >
+                          Save API Key
+                        </button>
+                        <button
+                          type="button"
+                          className="vscode-setting-action-btn"
+                          onClick={() => {
+                            setApiKeyInput(workspaceInfo.apiKey || "");
+                            setIsConfiguringApiKey(false);
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  )}
                 </div>
               )}
             </>
