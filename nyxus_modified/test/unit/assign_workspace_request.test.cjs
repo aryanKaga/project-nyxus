@@ -131,3 +131,16 @@ test('requestWorkspaceIdAssignment handles customName, description, and workspac
         workspace_id: 'existing-static-id'
     });
 });
+
+test('deleteWorkspaceHttp rejects if workspaceId is missing', async () => {
+    const { deleteWorkspaceHttp } = require('../../webviewprovider/assign_workspace_request');
+    await assert.rejects(
+        () => deleteWorkspaceHttp('http://localhost:3000', {
+            userId: '123',
+            apiKey: 'key',
+            workspaceId: ''
+        }),
+        /No workspace ID to delete/
+    );
+});
+

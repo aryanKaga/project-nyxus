@@ -65,18 +65,20 @@ class SettingsViewProvider {
                     await this._handleRequestWorkspaceId();
                     break;
                 }
-                case 'stage_workspace':
-                case 'unstage_workspace': {
+                case 'stage_workspace': {
                     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
                     try {
                         if (!workspaceRoot) throw new Error('Open a workspace folder first.');
-                        const { stageWorkspace, unstageWorkspace } = require('./workspace_archive');
-                        if (message.type === 'stage_workspace') await stageWorkspace(workspaceRoot);
-                        else await unstageWorkspace(workspaceRoot);
-                        this.sendMessage({ type: 'workspace_git_action_result', ok: true, action: message.type });
+                        const { stageWorkspace } = require('./workspace_archive');
+                        await stageWorkspace(workspaceRoot);
+                        this.sendMessage({ type: 'workspace_git_action_result', ok: true, action: 'stage_workspace' });
                     } catch (error) {
-                        this.sendMessage({ type: 'workspace_git_action_result', ok: false, action: message.type, error: error instanceof Error ? error.message : String(error) });
+                        this.sendMessage({ type: 'workspace_git_action_result', ok: false, action: 'stage_workspace', error: error instanceof Error ? error.message : String(error) });
                     }
+                    break;
+                }
+                case 'unstage_workspace': {
+                    await this._handleUnstageWorkspace(message);
                     break;
                 }
                 case 'clear_workspace_id': {
@@ -179,6 +181,68 @@ class SettingsViewProvider {
     }
 
     /**
+     * Unstages a workspace by deleting it on the server via HTTP and clearing local workspace ID.
+     * @param {object} [message]
+     * @private
+     */
+    async _handleUnstageWorkspace(message) {
+        const folder = vscode.workspace.workspaceFolders?.[0];
+        if (!folder) {
+            this.sendMessage({
+                type: 'workspace_git_action_result',
+                ok: false,
+                action: 'unstage_workspace',
+                error: 'Open a workspace folder first.'
+            });
+            return;
+        }
+
+        const workspaceId = (folder && this.context ? getStoredWorkspaceId(this.context, folder.uri) : '') || message?.workspaceId || '';
+        const config = vscode.workspace.getConfiguration('nyxusReplica');
+        const serverUrl = config.get('url') || 'http://localhost:80';
+        const userId = await require('./user_id_storage').getUserId(this.context);
+        const apiKey = await require('./api_key_storage').getApiKey(this.context);
+
+        try {
+            if (workspaceId) {
+                this.output.appendLine(`Unstaging workspace: deleting ${workspaceId} on server (${serverUrl})...`);
+                const { deleteWorkspaceHttp } = require('./assign_workspace_request');
+                await deleteWorkspaceHttp(serverUrl, {
+                    userId,
+                    apiKey,
+                    workspaceId
+                });
+                this.output.appendLine(`Server confirmed deletion of workspace: ${workspaceId}`);
+            }
+
+            // Remove the local stored workspace ID
+            await clearStoredWorkspaceId(this.context, folder.uri);
+            this.output.appendLine(`Cleared local workspace ID for ${folder.uri.toString()}`);
+
+            this.sendMessage({
+                type: 'workspace_git_action_result',
+                ok: true,
+                action: 'unstage_workspace',
+                message: 'Workspace unstaged and deleted from server.'
+            });
+
+            // Refresh UI immediately with empty workspaceId
+            await this._sendWorkspaceInfo();
+
+            vscode.window.showInformationMessage('Nyxus: Workspace unstaged and deleted from server.');
+        } catch (error) {
+            const detail = error instanceof Error ? error.message : String(error);
+            this.output.appendLine(`Unstage failed: ${detail}`);
+            this.sendMessage({
+                type: 'workspace_git_action_result',
+                ok: false,
+                action: 'unstage_workspace',
+                error: detail
+            });
+        }
+    }
+
+    /**
      * Clears the stored workspace ID for the active folder.
      * @private
      */
@@ -192,6 +256,7 @@ class SettingsViewProvider {
             type: 'clear_workspace_id_result',
             ok: true
         });
+        await this._sendWorkspaceInfo();
         vscode.window.showInformationMessage('Nyxus: Workspace ID cleared for this folder.');
     }
 

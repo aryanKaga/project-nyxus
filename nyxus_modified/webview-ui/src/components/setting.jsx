@@ -117,11 +117,12 @@ export default function Setting({ onBack }) {
         case "workspace_git_action_result":
           setLoading(false);
           if (message.ok && message.action === "unstage_workspace") {
+            setWorkspaceInfo((prev) => ({ ...prev, workspaceId: "" }));
             vscode.postMessage({ type: "get_workspace_info" });
           }
           setStatusMsg(message.ok
-            ? { type: "success", text: message.action === "stage_workspace" ? "Workspace staged." : "Workspace unstaged." }
-            : { type: "error", text: message.error || "Workspace staging failed." });
+            ? { type: "success", text: message.action === "stage_workspace" ? "Workspace staged." : "Workspace unstaged and deleted from server." }
+            : { type: "error", text: message.error || "Workspace action failed." });
           break;
 
         default:
@@ -146,8 +147,11 @@ export default function Setting({ onBack }) {
 
   const handleWorkspaceGitAction = (type) => {
     setLoading(true);
-    setStatusMsg({ type: "info", text: type === "stage_workspace" ? "Staging workspace..." : "Unstaging workspace..." });
-    vscode.postMessage({ type });
+    setStatusMsg({
+      type: "info",
+      text: type === "stage_workspace" ? "Staging workspace..." : "Unstaging workspace and deleting from server..."
+    });
+    vscode.postMessage({ type, workspaceId: workspaceInfo.workspaceId });
   };
 
   const handleSaveWorkspaceMetadata = (e) => {

@@ -308,16 +308,77 @@ class SidebarProvider {
                 return;
             }
 
-            if (message.type === 'stage_workspace' || message.type === 'unstage_workspace') {
+            if (message.type === 'stage_workspace') {
                 const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
                 try {
                     if (!workspaceRoot) throw new Error('Open a workspace folder first.');
-                    const { stageWorkspace, unstageWorkspace } = require('./workspace_archive');
-                    if (message.type === 'stage_workspace') await stageWorkspace(workspaceRoot);
-                    else await unstageWorkspace(workspaceRoot);
-                    this.sendMessage({ type: 'workspace_git_action_result', ok: true, action: message.type });
+                    const { stageWorkspace } = require('./workspace_archive');
+                    await stageWorkspace(workspaceRoot);
+                    this.sendMessage({ type: 'workspace_git_action_result', ok: true, action: 'stage_workspace' });
                 } catch (error) {
-                    this.sendMessage({ type: 'workspace_git_action_result', ok: false, action: message.type, error: error instanceof Error ? error.message : String(error) });
+                    this.sendMessage({ type: 'workspace_git_action_result', ok: false, action: 'stage_workspace', error: error instanceof Error ? error.message : String(error) });
+                }
+                return;
+            }
+
+            if (message.type === 'unstage_workspace') {
+                const folder = vscode.workspace.workspaceFolders?.[0];
+                if (!folder) {
+                    this.sendMessage({
+                        type: 'workspace_git_action_result',
+                        ok: false,
+                        action: 'unstage_workspace',
+                        error: 'Open a workspace folder first.'
+                    });
+                    return;
+                }
+
+                const workspaceId = (folder && this.context ? getStoredWorkspaceId(this.context, folder.uri) : '') || message.workspaceId || '';
+                const config = vscode.workspace.getConfiguration('nyxusReplica');
+                const serverUrl = config.get('url') || 'http://localhost:80';
+                const userId = await getUserId(this.context);
+                const apiKey = await getApiKey(this.context);
+
+                try {
+                    if (workspaceId) {
+                        const { deleteWorkspaceHttp } = require('./assign_workspace_request');
+                        await deleteWorkspaceHttp(serverUrl, {
+                            userId,
+                            apiKey,
+                            workspaceId
+                        });
+                    }
+
+                    await clearStoredWorkspaceId(this.context, folder.uri);
+
+                    this.sendMessage({
+                        type: 'workspace_git_action_result',
+                        ok: true,
+                        action: 'unstage_workspace',
+                        message: 'Workspace unstaged and deleted from server.'
+                    });
+
+                    // Send updated workspace info to update UI
+                    const meta = folder && this.context ? getStoredWorkspaceMeta(this.context, folder.uri) : { customName: '', description: '' };
+                    this.sendMessage({
+                        type: 'workspace_info',
+                        folderName: folder.name || '',
+                        folderPath: folder.uri.fsPath || '',
+                        workspaceId: '',
+                        customName: meta.customName,
+                        description: meta.description,
+                        apiKey,
+                        hasApiKey: Boolean(apiKey),
+                        userId,
+                        user_id: userId
+                    });
+                } catch (error) {
+                    this.sendMessage({
+                        type: 'workspace_git_action_result',
+                        ok: false,
+                        action: 'unstage_workspace',
+                        error: error instanceof Error ? error.message : String(error)
+                    });
                 }
                 return;
             }
