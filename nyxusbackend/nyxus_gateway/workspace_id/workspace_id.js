@@ -36,7 +36,8 @@ id_router.post("/request_id", async (req, res) => {
     try {
         // Assumes authentication middleware sets req.user
         const user_id = req.user?.user_id;
-
+        console.log(req.body)
+        console.log('user has user id', user_id)
         if (!user_id) {
             return res.status(401).json({
                 ok: false,
