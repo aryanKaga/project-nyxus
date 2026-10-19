@@ -1,0 +1,21 @@
+{
+  "name": "redis-session-demo",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "dotenv": "^18.0.8",
+    "express": "^5.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongodb": "^7.7.0",
+    "multer": "^2.4.0",
+    "redis": "^6.3.0"
+  }
+}
