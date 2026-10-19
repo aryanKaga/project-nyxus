@@ -1,0 +1,11 @@
+# Exclude from git archive export
+.gitattributes export-ignore
+.gitignore export-ignore
+Nyxus.mp4 export-ignore
+*.mp4 export-ignore
+.codegraph/** export-ignore
+.codegraph export-ignore
+nyxus_auto_memory.txt export-ignore
+*.sqlite export-ignore
+*.sqlite3 export-ignore
+*.db export-ignore
