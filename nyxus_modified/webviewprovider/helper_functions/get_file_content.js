@@ -23,7 +23,7 @@ async function get_file_content(file_name) {
         )
 
         if (!matches || matches.length === 0) {
-            console.warn('[Nyxus Replica] Requested workspace file was not found.');
+            console.warn('[Nyxus Modified] Requested workspace file was not found.');
             return
         }
 
@@ -32,7 +32,7 @@ async function get_file_content(file_name) {
 
         // Safety check: ensure resolved path is still inside the workspace
         if (!absolute_path.startsWith(workspaceRoot)) {
-            console.warn('[Nyxus Replica] Rejected a workspace file outside the open folder.');
+            console.warn('[Nyxus Modified] Rejected a workspace file outside the open folder.');
             return
         }
 
@@ -41,7 +41,7 @@ async function get_file_content(file_name) {
 
     }
     catch {
-        console.error('[Nyxus Replica] Workspace file lookup failed.');
+        console.error('[Nyxus Modified] Workspace file lookup failed.');
     }
 }
 

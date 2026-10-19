@@ -6,8 +6,9 @@ const { create_workspace_archive } = require('./workspace_archive');
 const { send_workspace_data } = require('./send_nyxus_data');
 const { createWebSocket } = require('./create_websocket');
 const { createFlowLogger } = require('./flowLogger');
-const { getStoredWorkspaceId, saveStoredWorkspaceId, clearStoredWorkspaceId } = require('./workspace_storage');
+const { getStoredWorkspaceId, saveStoredWorkspaceId, clearStoredWorkspaceId, getStoredWorkspaceMeta, saveStoredWorkspaceMeta } = require('./workspace_storage');
 const { requestWorkspaceIdAssignment } = require('./assign_workspace_request');
+const { getApiKey, setApiKey } = require('./api_key_storage');
 
 
 class SidebarProvider {
@@ -125,11 +126,14 @@ class SidebarProvider {
             const folderUri = vscode.workspace.workspaceFolders?.[0]?.uri;
             const reuseId = vscode.workspace.getConfiguration('nyxusReplica').get('autoReuseWorkspaceId', true);
             const storedWorkspaceId = reuseId && folderUri && this.context ? getStoredWorkspaceId(this.context, folderUri) : undefined;
+            const meta = folderUri && this.context ? getStoredWorkspaceMeta(this.context, folderUri) : { customName: '', description: '' };
 
             const result = await send_workspace_data(this.logFlow.bind(this), {
                 archive: this.workspaceArchive,
                 fileCount: this.workspaceFileCount,
-                workspaceName: this.workspaceName,
+                workspaceName: meta.customName || this.workspaceName,
+                customName: meta.customName,
+                description: meta.description,
                 workspace_id: storedWorkspaceId
             }, this.context);
             this.workspaceDataSent = true;
@@ -237,28 +241,54 @@ class SidebarProvider {
                 const folder = vscode.workspace.workspaceFolders?.[0];
                 const folderUri = folder?.uri;
                 const folderName = folder?.name || '';
+                const folderPath = folderUri?.fsPath || '';
                 const workspaceId = folderUri && this.context ? (getStoredWorkspaceId(this.context, folderUri) || '') : '';
+                const meta = folderUri && this.context ? getStoredWorkspaceMeta(this.context, folderUri) : { customName: '', description: '' };
+                const apiKey = await getApiKey(this.context);
                 this.sendMessage({
                     type: 'workspace_info',
                     folderName,
+                    folderPath,
                     workspaceId,
-                    hasApiKey: Boolean(await require('./api_key_storage').getApiKey(this.context))
+                    customName: meta.customName,
+                    description: meta.description,
+                    apiKey,
+                    hasApiKey: Boolean(apiKey)
                 });
                 return;
             }
 
             if (message.type === 'save_api_key') {
                 const apiKey = typeof message.apiKey === 'string' ? message.apiKey.trim() : '';
-                if (!apiKey) {
-                    this.sendMessage({ type: 'save_api_key_result', ok: false, error: 'Enter an API key to save.' });
-                    return;
-                }
                 try {
-                    await this.context.secrets.store('nyxusReplica.apiKey', apiKey);
-                    this.sendMessage({ type: 'save_api_key_result', ok: true });
-                    await this.reconnect();
+                    await setApiKey(this.context, apiKey);
+                    this.sendMessage({ type: 'save_api_key_result', ok: true, apiKey, message: 'API key saved successfully.' });
+                    await this.reconnect?.();
                 } catch (error) {
                     this.sendMessage({ type: 'save_api_key_result', ok: false, error: error instanceof Error ? error.message : String(error) });
+                }
+                return;
+            }
+
+            if (message.type === 'save_workspace_metadata') {
+                const folder = vscode.workspace.workspaceFolders?.[0];
+                if (!folder) {
+                    this.sendMessage({ type: 'save_workspace_metadata_result', ok: false, error: 'No workspace folder open.' });
+                    return;
+                }
+                const customName = typeof message.customName === 'string' ? message.customName.trim() : '';
+                const description = typeof message.description === 'string' ? message.description.trim() : '';
+                try {
+                    await saveStoredWorkspaceMeta(this.context, folder.uri, { customName, description });
+                    this.sendMessage({
+                        type: 'save_workspace_metadata_result',
+                        ok: true,
+                        customName,
+                        description,
+                        message: 'Workspace details saved.'
+                    });
+                } catch (error) {
+                    this.sendMessage({ type: 'save_workspace_metadata_result', ok: false, error: error instanceof Error ? error.message : String(error) });
                 }
                 return;
             }
@@ -341,10 +371,13 @@ class SidebarProvider {
                 }
 
                 try {
+                    const meta = folder && this.context ? getStoredWorkspaceMeta(this.context, folder.uri) : { customName: '', description: '' };
                     const result = await requestWorkspaceIdAssignment(socket, {
                         userId,
                         apiKey,
-                        workspaceName: folder.name
+                        workspaceName: meta.customName || folder.name,
+                        customName: meta.customName,
+                        description: meta.description
                     }, config.get('requestTimeout', 15000));
 
                     if (result && result.ok && result.workspace_id) {
@@ -502,7 +535,7 @@ class SidebarProvider {
         return `<!DOCTYPE html>
 <html>
 <body style="font-family: sans-serif; padding: 12px; color: var(--vscode-foreground); background: var(--vscode-editor-background);">
-    <h3>Nyxus Replica could not load its chat UI</h3>
+    <h3>Nyxus Modified could not load its chat UI</h3>
     <pre style="white-space: pre-wrap; font-size: 12px;">${message}</pre>
     <p>Run <code>npm run build</code> in the extension folder, then reload the window.</p>
 </body>

@@ -4,7 +4,9 @@ const {
     getWorkspaceStorageKey,
     getStoredWorkspaceId,
     saveStoredWorkspaceId,
-    clearStoredWorkspaceId
+    clearStoredWorkspaceId,
+    getStoredWorkspaceMeta,
+    saveStoredWorkspaceMeta
 } = require('../../webviewprovider/workspace_storage');
 
 function createMockContext() {
@@ -69,4 +71,21 @@ test('workspace_storage trims whitespace and validates input', async () => {
         () => saveStoredWorkspaceId(context, folder, '   '),
         /Invalid arguments/
     );
+});
+
+test('workspace_storage saves and retrieves customName and description metadata', async () => {
+    const context = createMockContext();
+    const folder = { toString: () => 'file:///workspaces/repo-meta' };
+
+    assert.deepEqual(getStoredWorkspaceMeta(context, folder), { customName: '', description: '' });
+
+    await saveStoredWorkspaceMeta(context, folder, {
+        customName: '  My API Server  ',
+        description: '  Core auth service  '
+    });
+
+    assert.deepEqual(getStoredWorkspaceMeta(context, folder), {
+        customName: 'My API Server',
+        description: 'Core auth service'
+    });
 });

@@ -50,10 +50,12 @@ test('requestWorkspaceIdAssignment emits assign_workspace_id and resolves on val
 
     assert.equal(emittedEvent, ASSIGN_EVENT);
     assert.deepEqual(emittedPayload, {
-        user_id: 'test-user-id',
         apiKey: 'test-key',
         apikey: 'test-key',
-        workspace_name: 'my-project'
+        workspace_name: 'my-project',
+        custom_name: 'my-project',
+        description: '',
+        user_id: 'test-user-id'
     });
     assert.deepEqual(result, {
         ok: true,
@@ -95,4 +97,33 @@ test('requestWorkspaceIdAssignment rejects when request times out', async () => 
         ),
         /timed out/
     );
+});
+
+test('requestWorkspaceIdAssignment handles customName, description, and workspaceId', async () => {
+    let capturedData = null;
+    const mockSocket = {
+        connected: true,
+        emit(event, data, callback) {
+            capturedData = data;
+            callback({ ok: true, workspace_id: 'ws-assigned-99' });
+        }
+    };
+
+    const res = await requestWorkspaceIdAssignment(mockSocket, {
+        apiKey: 'secret-key',
+        customName: 'Custom Service',
+        description: 'Microservice description',
+        workspaceId: 'existing-static-id'
+    });
+
+    assert.equal(res.ok, true);
+    assert.equal(res.workspace_id, 'ws-assigned-99');
+    assert.deepEqual(capturedData, {
+        apiKey: 'secret-key',
+        apikey: 'secret-key',
+        workspace_name: 'Custom Service',
+        custom_name: 'Custom Service',
+        description: 'Microservice description',
+        workspace_id: 'existing-static-id'
+    });
 });

@@ -42,11 +42,20 @@ function requestWorkspaceIdAssignment(socket, payload, timeoutMs = DEFAULT_ASSIG
         }, timeoutMs);
 
         const requestData = {
-            user_id: payload.userId,
             apiKey: payload.apiKey,
             apikey: payload.apiKey,
-            workspace_name: payload.workspaceName
+            workspace_name: payload.customName || payload.workspaceName || '',
+            custom_name: payload.customName || payload.workspaceName || '',
+            description: payload.description || ''
         };
+
+        if (payload.workspaceId) {
+            requestData.workspace_id = payload.workspaceId;
+        }
+
+        if (payload.userId) {
+            requestData.user_id = payload.userId;
+        }
 
         try {
             socket.emit(ASSIGN_EVENT, requestData, (response) => {

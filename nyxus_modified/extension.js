@@ -4,7 +4,7 @@ const vscode = require('vscode');
  * @param {import('vscode').ExtensionContext} context
  */
 function activate(context) {
-    const output = vscode.window.createOutputChannel('Nyxus Replica');
+    const output = vscode.window.createOutputChannel('Nyxus Modified');
     /** @type {import('./webviewprovider/SidebarProvider').SidebarProvider | undefined} */
     let sidebarProvider;
     /** @type {ReturnType<typeof setTimeout> | undefined} */
@@ -79,7 +79,7 @@ function activate(context) {
                     const detail = error instanceof Error ? error.message : String(error);
                     output.appendLine(`Nyxus sidebar initialization failed: ${detail}`);
                     try {
-                        webview.html = '<!DOCTYPE html><html><body><p>Nyxus could not start. See the Nyxus Replica output channel.</p></body></html>';
+                        webview.html = '<!DOCTYPE html><html><body><p>Nyxus could not start. See the Nyxus Modified output channel.</p></body></html>';
                     } catch {
                         // webview was disposed before we could update it — nothing to do
                     }

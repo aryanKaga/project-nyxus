@@ -1,7 +1,7 @@
 {
   "name": "nyxus-coding-agent-replica",
-  "displayName": "Nyxus Coding Agent Replica",
-  "description": "A minimal VS Code activation test for Nyxus.",
+  "displayName": "Nyxus Modified",
+  "description": "Nyxus Modified - Coding Agent",
   "version": "0.0.1",
   "publisher": "your-name",
   "main": "./extension.js",
@@ -16,7 +16,7 @@
       "activitybar": [
         {
           "id": "nyxusReplica",
-          "title": "Nyxus Replica",
+          "title": "Nyxus Modified",
           "icon": "media/icon.svg"
         }
       ]
@@ -38,7 +38,7 @@
       },
       {
         "command": "nyxusReplica.openSidebar",
-        "title": "Open Nyxus Replica Sidebar"
+        "title": "Open Nyxus Modified Sidebar"
       },
       {
         "command": "nyxusReplica.openSettings",

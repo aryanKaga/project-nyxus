@@ -38,6 +38,9 @@ async function send_workspace_data(logFlow, workspaceData, context) {
                 user_id: userId,
                 api_key: apiKey,
                 workspace_id: workspaceId,
+                workspace_name: workspaceData.workspaceName || '',
+                custom_name: workspaceData.customName || workspaceData.workspaceName || '',
+                description: workspaceData.description || '',
                 archive: workspaceData.archive.toString('base64')
             }),
             signal: controller.signal

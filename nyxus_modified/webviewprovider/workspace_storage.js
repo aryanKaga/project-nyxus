@@ -60,9 +60,55 @@ async function clearStoredWorkspaceId(context, folderUri) {
     await context.globalState.update(key, undefined);
 }
 
+const META_PREFIX = 'nyxusReplica.workspaceMeta:';
+
+function getWorkspaceMetaStorageKey(folderUri) {
+    const uriStr = typeof folderUri === 'string' ? folderUri : folderUri.toString();
+    return `${META_PREFIX}${uriStr}`;
+}
+
+/**
+ * Retrieves the stored workspace metadata (customName, description) for a folder URI.
+ * @param {import('vscode').ExtensionContext} context
+ * @param {import('vscode').Uri | string} folderUri
+ * @returns {{ customName: string, description: string }}
+ */
+function getStoredWorkspaceMeta(context, folderUri) {
+    if (!context || !folderUri) {
+        return { customName: '', description: '' };
+    }
+    const key = getWorkspaceMetaStorageKey(folderUri);
+    const meta = context.globalState.get(key) || {};
+    return {
+        customName: typeof meta.customName === 'string' ? meta.customName : '',
+        description: typeof meta.description === 'string' ? meta.description : ''
+    };
+}
+
+/**
+ * Saves workspace metadata (customName, description) for a folder URI.
+ * @param {import('vscode').ExtensionContext} context
+ * @param {import('vscode').Uri | string} folderUri
+ * @param {{ customName?: string, description?: string }} meta
+ * @returns {Promise<boolean>}
+ */
+async function saveStoredWorkspaceMeta(context, folderUri, meta) {
+    if (!context || !folderUri) {
+        throw new Error('Invalid arguments for saving workspace metadata.');
+    }
+    const key = getWorkspaceMetaStorageKey(folderUri);
+    await context.globalState.update(key, {
+        customName: typeof meta?.customName === 'string' ? meta.customName.trim() : '',
+        description: typeof meta?.description === 'string' ? meta.description.trim() : ''
+    });
+    return true;
+}
+
 module.exports = {
     getWorkspaceStorageKey,
     getStoredWorkspaceId,
     saveStoredWorkspaceId,
-    clearStoredWorkspaceId
+    clearStoredWorkspaceId,
+    getStoredWorkspaceMeta,
+    saveStoredWorkspaceMeta
 };
