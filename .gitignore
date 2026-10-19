@@ -56,3 +56,9 @@ nyxus_auto_memory.txt
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+.codegraph/
+Nyxus.mp4
+*.sqlite
+*.sqlite3
+*.mp4
