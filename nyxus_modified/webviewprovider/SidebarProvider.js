@@ -6,7 +6,8 @@ const { create_workspace_archive } = require('./workspace_archive');
 const { send_workspace_data } = require('./send_nyxus_data');
 const { createWebSocket } = require('./create_websocket');
 const { createFlowLogger } = require('./flowLogger');
-const { getStoredWorkspaceId } = require('./workspace_storage');
+const { getStoredWorkspaceId, saveStoredWorkspaceId, clearStoredWorkspaceId } = require('./workspace_storage');
+const { requestWorkspaceIdAssignment } = require('./assign_workspace_request');
 
 
 class SidebarProvider {
@@ -225,7 +226,127 @@ class SidebarProvider {
             }
 
             if (message.type === 'open_settings') {
-                vscode.commands.executeCommand('nyxusReplica.openSettings');
+                this.sendMessage({ type: 'set_view', view: 'settings' });
+                return;
+            }
+
+            if (message.type === 'get_workspace_info') {
+                const folder = vscode.workspace.workspaceFolders?.[0];
+                const folderUri = folder?.uri;
+                const folderName = folder?.name || '';
+                const workspaceId = folderUri && this.context ? (getStoredWorkspaceId(this.context, folderUri) || '') : '';
+                this.sendMessage({
+                    type: 'workspace_info',
+                    folderName,
+                    workspaceId
+                });
+                return;
+            }
+
+            if (message.type === 'request_workspace_id') {
+                const folder = vscode.workspace.workspaceFolders?.[0];
+                if (!folder) {
+                    this.sendMessage({
+                        type: 'assign_workspace_id_result',
+                        ok: false,
+                        error: 'No workspace folder is open in VS Code. Open a project folder first.'
+                    });
+                    return;
+                }
+
+                const config = vscode.workspace.getConfiguration('nyxusReplica');
+                const serverUrl = config.get('url');
+                const apiKey = config.get('apiKey');
+                const userId = config.get('userId');
+
+                if (!apiKey) {
+                    this.sendMessage({
+                        type: 'assign_workspace_id_result',
+                        ok: false,
+                        error: 'Nyxus API key is not configured.'
+                    });
+                    return;
+                }
+
+                let socket = this.socket;
+                let isTemporary = false;
+
+                if (!socket || !socket.connected) {
+                    try {
+                        const { io } = require('socket.io-client');
+                        socket = io(serverUrl, {
+                            auth: { apiKey },
+                            timeout: 8000,
+                            reconnection: false
+                        });
+                        isTemporary = true;
+                        await new Promise((resolve, reject) => {
+                            const timer = setTimeout(() => {
+                                socket.disconnect();
+                                reject(new Error('Connection timed out.'));
+                            }, 8000);
+                            socket.once('connect', () => {
+                                clearTimeout(timer);
+                                resolve();
+                            });
+                            socket.once('connect_error', (err) => {
+                                clearTimeout(timer);
+                                socket.disconnect();
+                                reject(err);
+                            });
+                        });
+                    } catch (err) {
+                        this.sendMessage({
+                            type: 'assign_workspace_id_result',
+                            ok: false,
+                            error: `Could not connect to Nyxus server: ${err.message}`
+                        });
+                        return;
+                    }
+                }
+
+                try {
+                    const result = await requestWorkspaceIdAssignment(socket, {
+                        userId,
+                        apiKey,
+                        workspaceName: folder.name
+                    });
+
+                    if (result && result.ok && result.workspace_id) {
+                        await saveStoredWorkspaceId(this.context, folder.uri, result.workspace_id);
+                        this.sendMessage({
+                            type: 'assign_workspace_id_result',
+                            ok: true,
+                            workspaceId: result.workspace_id
+                        });
+                        vscode.window.showInformationMessage(`Nyxus: Workspace ID assigned (${result.workspace_id})`);
+                    } else {
+                        throw new Error('Server returned an invalid response.');
+                    }
+                } catch (error) {
+                    this.sendMessage({
+                        type: 'assign_workspace_id_result',
+                        ok: false,
+                        error: error instanceof Error ? error.message : String(error)
+                    });
+                } finally {
+                    if (isTemporary && socket) {
+                        socket.disconnect();
+                    }
+                }
+                return;
+            }
+
+            if (message.type === 'clear_workspace_id') {
+                const folder = vscode.workspace.workspaceFolders?.[0];
+                if (folder && this.context) {
+                    await clearStoredWorkspaceId(this.context, folder.uri);
+                }
+                this.sendMessage({
+                    type: 'clear_workspace_id_result',
+                    ok: true
+                });
+                vscode.window.showInformationMessage('Nyxus: Workspace ID cleared for this folder.');
                 return;
             }
 

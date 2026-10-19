@@ -3,8 +3,11 @@ import { getVsCodeApi } from "./vscodeApi";
 
 const vscode = getVsCodeApi();
 
-export default function ChatHeader({ connectionStatus }) {
+export default function ChatHeader({ connectionStatus, onOpenSettings }) {
   const handleOpenSettings = () => {
+    if (typeof onOpenSettings === "function") {
+      onOpenSettings();
+    }
     vscode.postMessage({ type: "open_settings" });
   };
 

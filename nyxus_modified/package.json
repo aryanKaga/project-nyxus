@@ -28,12 +28,6 @@
           "name": "Nyxus Chat",
           "type": "webview",
           "icon": "media/icon.svg"
-        },
-        {
-          "id": "nyxusReplica.settings",
-          "name": "Nyxus Settings",
-          "type": "webview",
-          "icon": "media/icon.svg"
         }
       ]
     },

@@ -58,6 +58,8 @@ Module._load = function (request, parent, isMain) {
                     providerResolveCount += 1;
                 }
 
+                sendMessage() {}
+
                 dispose() {
                     providerDisposed = true;
                 }
@@ -87,7 +89,7 @@ after(() => {
 
 const extension = require('../../extension');
 
-test('keeps extension activation lightweight and loads the sidebar and settings on demand', async () => {
+test('keeps extension activation lightweight and loads the sidebar on demand', async () => {
     const subscriptions = [];
 
     extension.activate({
@@ -95,14 +97,12 @@ test('keeps extension activation lightweight and loads the sidebar and settings 
         extensionUri: { fsPath: path.resolve(__dirname, '../..') }
     });
 
-    assert.equal(subscriptions.length, 7);
+    assert.equal(subscriptions.length, 6);
     assert.equal(providerLoadCount, 0);
-    assert.equal(settingsLoadCount, 0);
     assert.ok(registeredCommands.has('nyxusReplica.sayHi'));
     assert.ok(registeredCommands.has('nyxusReplica.openSidebar'));
     assert.ok(registeredCommands.has('nyxusReplica.openSettings'));
     assert.ok(registeredViews.has('nyxusReplica.sidebar'));
-    assert.ok(registeredViews.has('nyxusReplica.settings'));
 
     let renderedHtml = '';
     let webviewOptions;
@@ -125,33 +125,16 @@ test('keeps extension activation lightweight and loads the sidebar and settings 
     assert.match(renderedHtml, /Starting Nyxus/);
     assert.equal(providerLoadCount, 0);
 
-    let settingsHtml = '';
-    registeredViews.get('nyxusReplica.settings').resolveWebviewView({
-        webview: {
-            set options(value) {},
-            set html(value) {
-                settingsHtml = value;
-            }
-        },
-        onDidDispose() {}
-    });
-
-    assert.match(settingsHtml, /Starting Nyxus Settings/);
-    assert.equal(settingsLoadCount, 0);
-
     await new Promise((resolve) => setTimeout(resolve, 20));
 
     assert.equal(providerLoadCount, 1);
     assert.equal(providerResolveCount, 1);
-    assert.equal(settingsLoadCount, 1);
-    assert.equal(settingsResolveCount, 1);
     assert.ok(createdProvider);
     assert.equal(typeof disposeHandler, 'function');
 
     // Trigger cleanup
-    subscriptions[6].dispose();
+    subscriptions[5].dispose();
     assert.equal(providerDisposed, true);
-    assert.equal(settingsDisposed, true);
 });
 
 test('shows a greeting notification when the command runs', async () => {

@@ -23,10 +23,10 @@ export default function App() {
   }, []);
 
   if (currentView === "settings") {
-    return <Setting />;
+    return <Setting onBack={() => setCurrentView("chat")} />;
   }
 
-  return <NyxusChat />;
+  return <NyxusChat onOpenSettings={() => setCurrentView("settings")} />;
 }
 
 

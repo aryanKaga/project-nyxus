@@ -5,14 +5,10 @@ import "./NyxusSettings.css";
 
 const vscode = getVsCodeApi();
 
-export default function Setting() {
+export default function Setting({ onBack }) {
   const [workspaceInfo, setWorkspaceInfo] = useState({
     workspaceId: "",
-    folderPath: "",
     folderName: "",
-    serverUrl: "",
-    userId: "",
-    isSyncing: false,
   });
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState({ type: "", text: "" });
@@ -26,11 +22,7 @@ export default function Setting() {
         case "workspace_info":
           setWorkspaceInfo({
             workspaceId: message.workspaceId || "",
-            folderPath: message.folderPath || "",
             folderName: message.folderName || "",
-            serverUrl: message.serverUrl || "",
-            userId: message.userId || "",
-            isSyncing: message.isSyncing || false,
           });
           break;
         case "assign_workspace_id_result":
@@ -70,7 +62,7 @@ export default function Setting() {
 
   const handleRequestWorkspaceId = () => {
     setLoading(true);
-    setStatusMsg({ type: "info", text: "Requesting Workspace ID from Nyxus server..." });
+    setStatusMsg({ type: "info", text: "Requesting Workspace ID from server..." });
     vscode.postMessage({ type: "request_workspace_id" });
   };
 
@@ -89,10 +81,19 @@ export default function Setting() {
   return (
     <div className="nyxus-settings-container">
       <div className="nyxus-settings-header">
-        <h2 className="nyxus-settings-title">Workspace Settings</h2>
-        <p className="nyxus-settings-sub">
-          Manage Workspace ID assignment and persistence for this repository folder.
-        </p>
+        <div className="nyxus-header-top-row">
+          {onBack && (
+            <button
+              type="button"
+              className="nyxus-back-btn"
+              onClick={onBack}
+              title="Back to Chat"
+            >
+              ← Back to Chat
+            </button>
+          )}
+          <h2 className="nyxus-settings-title">Nyxus Settings</h2>
+        </div>
       </div>
 
       {statusMsg.text && (
@@ -110,31 +111,17 @@ export default function Setting() {
 
       <div className="nyxus-settings-card">
         <div className="nyxus-card-header">
-          <span className="nyxus-card-title">Active Folder</span>
-          <span className="nyxus-folder-badge">
-            {workspaceInfo.folderName || "No folder open"}
-          </span>
-        </div>
-        <div className="nyxus-card-body">
-          <label className="nyxus-field-label">Path:</label>
-          <div className="nyxus-code-box" title={workspaceInfo.folderPath}>
-            {workspaceInfo.folderPath || "None"}
-          </div>
-        </div>
-      </div>
-
-      <div className="nyxus-settings-card">
-        <div className="nyxus-card-header">
           <span className="nyxus-card-title">Workspace ID</span>
-          {workspaceInfo.workspaceId ? (
-            <span className="nyxus-badge-active">Stored in VS Code</span>
-          ) : (
-            <span className="nyxus-badge-missing">Not Assigned</span>
+          {workspaceInfo.folderName && (
+            <span className="nyxus-folder-badge" title={workspaceInfo.folderName}>
+              {workspaceInfo.folderName}
+            </span>
           )}
         </div>
+
         <div className="nyxus-card-body">
           <p className="nyxus-description">
-            The Workspace ID links your local codebase archive with Nyxus server storage & conversation memory.
+            Assign a unique Workspace ID for this project to link local code archives with Nyxus server storage.
           </p>
 
           <div className="nyxus-input-group">
@@ -150,7 +137,7 @@ export default function Setting() {
                 type="button"
                 className="nyxus-btn nyxus-btn-ghost"
                 onClick={() => copyToClipboard(workspaceInfo.workspaceId)}
-                title="Copy ID"
+                title="Copy Workspace ID"
               >
                 Copy
               </button>
@@ -167,7 +154,7 @@ export default function Setting() {
               {loading ? (
                 <>
                   <RefreshIcon className="nyxus-spin" size={14} />
-                  <span>Assigning...</span>
+                  <span>Requesting ID...</span>
                 </>
               ) : workspaceInfo.workspaceId ? (
                 "Reassign / Refresh ID"
@@ -182,28 +169,11 @@ export default function Setting() {
                 className="nyxus-btn nyxus-btn-danger"
                 onClick={handleClearWorkspaceId}
                 disabled={loading}
+                title="Clear stored Workspace ID"
               >
                 Clear
               </button>
             )}
-          </div>
-        </div>
-      </div>
-
-      <div className="nyxus-settings-card">
-        <div className="nyxus-card-header">
-          <span className="nyxus-card-title">Connection Info</span>
-        </div>
-        <div className="nyxus-card-body">
-          <div className="nyxus-meta-row">
-            <span className="nyxus-meta-label">Server URL:</span>
-            <span className="nyxus-meta-val">{workspaceInfo.serverUrl || "Not set"}</span>
-          </div>
-          <div className="nyxus-meta-row">
-            <span className="nyxus-meta-label">User ID:</span>
-            <span className="nyxus-meta-val nyxus-truncate" title={workspaceInfo.userId}>
-              {workspaceInfo.userId || "Not set"}
-            </span>
           </div>
         </div>
       </div>

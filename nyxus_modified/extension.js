@@ -56,55 +56,13 @@ function activate(context) {
     };
     const sidebar = vscode.window.registerWebviewViewProvider('nyxusReplica.sidebar', viewProvider);
 
-    const settingsProvider = {
-        /**
-         * @param {import('vscode').WebviewView} webviewView
-         */
-        resolveWebviewView(webviewView) {
-            const webview = webviewView.webview;
-            webview.html = '<!DOCTYPE html><html><body><p>Starting Nyxus Settings…</p></body></html>';
-
-            settingsInitializationTimer = setTimeout(() => {
-                settingsInitializationTimer = undefined;
-                try {
-                    const { SettingsViewProvider } = require('./webviewprovider/SettingsViewProvider');
-                    if (!settingsViewProvider) {
-                        settingsViewProvider = new SettingsViewProvider(context, output, () => sidebarProvider?.socket);
-                    }
-                    settingsViewProvider.resolveWebviewView(webviewView);
-                } catch (error) {
-                    const detail = error instanceof Error ? error.message : String(error);
-                    output.appendLine(`Nyxus settings initialization failed: ${detail}`);
-                    try {
-                        webview.html = '<!DOCTYPE html><html><body><p>Nyxus Settings could not start. See the Nyxus Replica output channel.</p></body></html>';
-                    } catch {
-                        // webview was disposed
-                    }
-                }
-            }, 0);
-
-            webviewView.onDidDispose(() => {
-                if (settingsInitializationTimer !== undefined) {
-                    clearTimeout(settingsInitializationTimer);
-                    settingsInitializationTimer = undefined;
-                }
-            });
-        }
-    };
-    const settingsView = vscode.window.registerWebviewViewProvider('nyxusReplica.settings', settingsProvider);
-
     const cleanup = {
         dispose() {
             if (initializationTimer !== undefined) {
                 clearTimeout(initializationTimer);
                 initializationTimer = undefined;
             }
-            if (settingsInitializationTimer !== undefined) {
-                clearTimeout(settingsInitializationTimer);
-                settingsInitializationTimer = undefined;
-            }
             sidebarProvider?.dispose();
-            settingsViewProvider?.dispose();
         }
     };
 
@@ -114,10 +72,10 @@ function activate(context) {
 
     const openSettings = vscode.commands.registerCommand('nyxusReplica.openSettings', async () => {
         await vscode.commands.executeCommand('workbench.view.extension.nyxusReplica');
-        await vscode.commands.executeCommand('nyxusReplica.settings.focus');
+        sidebarProvider?.sendMessage({ type: 'set_view', view: 'settings' });
     });
 
-    context.subscriptions.push(output, sayHi, sidebar, settingsView, openSidebar, openSettings, cleanup);
+    context.subscriptions.push(output, sayHi, sidebar, openSidebar, openSettings, cleanup);
 }
 
 function deactivate() {}

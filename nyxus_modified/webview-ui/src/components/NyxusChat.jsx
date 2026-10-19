@@ -6,12 +6,15 @@ import RequestFlow from "./chat/RequestFlow";
 import { useNyxusChat } from "./chat/useNyxusChat";
 import "./NyxusChat.css";
 
-export default function NyxusChat() {
+export default function NyxusChat({ onOpenSettings }) {
   const chat = useNyxusChat();
 
   return (
     <main className="nyxus-root">
-      <ChatHeader connectionStatus={chat.connectionStatus} />
+      <ChatHeader
+        connectionStatus={chat.connectionStatus}
+        onOpenSettings={onOpenSettings}
+      />
       <RequestFlow events={chat.flowEvents} />
       <ChatStatus
         connectionMessage={chat.connectionMessage}
