@@ -19,6 +19,46 @@ function activate(context) {
         return vscode.window.showInformationMessage('Hi from the Nyxus test extension!');
     });
 
+    const { migrateLegacyApiKey } = require('./webviewprovider/api_key_storage');
+    void migrateLegacyApiKey(context).catch((error) => {
+        output.appendLine(`Nyxus API key migration failed: ${error instanceof Error ? error.message : String(error)}`);
+    });
+    const setApiKey = vscode.commands.registerCommand('nyxusReplica.setApiKey', async () => {
+        const value = await vscode.window.showInputBox({
+            prompt: 'Enter the API key for your Nyxus server',
+            password: true,
+            ignoreFocusOut: true
+        });
+        if (value === undefined) return;
+        if (!value.trim()) {
+            await context.secrets.delete('nyxusReplica.apiKey');
+            await vscode.window.showInformationMessage('Nyxus API key cleared.');
+            await sidebarProvider?.reconnect();
+            return;
+        }
+        await context.secrets.store('nyxusReplica.apiKey', value.trim());
+        await vscode.window.showInformationMessage('Nyxus API key saved securely.');
+        await sidebarProvider?.reconnect();
+    });
+    const openNativeSettings = vscode.commands.registerCommand('nyxusReplica.openNativeSettings', () =>
+        vscode.commands.executeCommand('workbench.action.openSettings', '@ext:your-name.nyxus-coding-agent-replica')
+    );
+    const configurationListener = vscode.workspace?.onDidChangeConfiguration?.((event) => {
+        if (event.affectsConfiguration('nyxusReplica.url')
+            || event.affectsConfiguration('nyxusReplica.connectionTimeout')
+            || event.affectsConfiguration('nyxusReplica.reconnectionDelay')) {
+            void sidebarProvider?.reconnect();
+        }
+        if (event.affectsConfiguration('nyxusReplica.enableWorkspaceSync')
+            || event.affectsConfiguration('nyxusReplica.workspaceSyncBehavior')) {
+            const config = vscode.workspace.getConfiguration('nyxusReplica');
+            if (config.get('enableWorkspaceSync', true)
+                && config.get('workspaceSyncBehavior', 'onSidebarOpen') === 'onSidebarOpen') {
+                void sidebarProvider?.prepareWorkspace();
+            }
+        }
+    });
+
     const viewProvider = {
         /**
          * @param {import('vscode').WebviewView} webviewView
@@ -75,7 +115,8 @@ function activate(context) {
         sidebarProvider?.sendMessage({ type: 'set_view', view: 'settings' });
     });
 
-    context.subscriptions.push(output, sayHi, sidebar, openSidebar, openSettings, cleanup);
+    context.subscriptions.push(output, sayHi, setApiKey, openNativeSettings, sidebar, openSidebar, openSettings, cleanup);
+    if (configurationListener) context.subscriptions.push(configurationListener);
 }
 
 function deactivate() {}

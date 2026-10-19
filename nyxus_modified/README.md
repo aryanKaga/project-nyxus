@@ -25,7 +25,8 @@ python server.py
 The receiver listens on `127.0.0.1:3000` by default, validates the configured
 API key, safely unpacks the archive, and stores each transfer in
 `hybridbackend/workspaces/<workspace-id>/`. Set `NYXUS_API_KEY` to the same
-value configured by `nyxusReplica.apiKey` in VS Code. To accept connections
+value stored through **Nyxus: Set API Key** in VS Code. The key is kept in
+VS Code SecretStorage and does not appear in settings. To accept connections
 from another machine, configure `NYXUS_HOST` and protect the receiver with
 appropriate network controls.
 

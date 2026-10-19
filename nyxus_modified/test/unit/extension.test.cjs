@@ -97,11 +97,13 @@ test('keeps extension activation lightweight and loads the sidebar on demand', a
         extensionUri: { fsPath: path.resolve(__dirname, '../..') }
     });
 
-    assert.equal(subscriptions.length, 6);
+    assert.equal(subscriptions.length, 8);
     assert.equal(providerLoadCount, 0);
     assert.ok(registeredCommands.has('nyxusReplica.sayHi'));
     assert.ok(registeredCommands.has('nyxusReplica.openSidebar'));
     assert.ok(registeredCommands.has('nyxusReplica.openSettings'));
+    assert.ok(registeredCommands.has('nyxusReplica.setApiKey'));
+    assert.ok(registeredCommands.has('nyxusReplica.openNativeSettings'));
     assert.ok(registeredViews.has('nyxusReplica.sidebar'));
 
     let renderedHtml = '';
@@ -133,7 +135,7 @@ test('keeps extension activation lightweight and loads the sidebar on demand', a
     assert.equal(typeof disposeHandler, 'function');
 
     // Trigger cleanup
-    subscriptions[5].dispose();
+    subscriptions[7].dispose();
     assert.equal(providerDisposed, true);
 });
 

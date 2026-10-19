@@ -21,6 +21,7 @@ class SidebarProvider {
         this.output = output;
         /** @type {import('vscode').WebviewView | undefined} */
         this._view = undefined;
+        this._webview = undefined;
         /** @type {import('socket.io-client').Socket | undefined} */
         this.socket = undefined;
         this.workspaceReady = false;
@@ -122,14 +123,15 @@ class SidebarProvider {
         this.sendingWorkspaceData = true;
         try {
             const folderUri = vscode.workspace.workspaceFolders?.[0]?.uri;
-            const storedWorkspaceId = folderUri && this.context ? getStoredWorkspaceId(this.context, folderUri) : undefined;
+            const reuseId = vscode.workspace.getConfiguration('nyxusReplica').get('autoReuseWorkspaceId', true);
+            const storedWorkspaceId = reuseId && folderUri && this.context ? getStoredWorkspaceId(this.context, folderUri) : undefined;
 
             const result = await send_workspace_data(this.logFlow.bind(this), {
                 archive: this.workspaceArchive,
                 fileCount: this.workspaceFileCount,
                 workspaceName: this.workspaceName,
                 workspace_id: storedWorkspaceId
-            });
+            }, this.context);
             this.workspaceDataSent = true;
             this.workspaceStatus = {
                 status: 'ready',
@@ -161,6 +163,7 @@ class SidebarProvider {
     resolveWebviewView(webviewView) {
         this._view = webviewView;
         const webview = webviewView.webview;
+        this._webview = webview;
         const distUri = vscode.Uri.joinPath(this.extensionUri, 'webview-ui', 'dist');
         /**
          * every time a webview closes it disconnects with the socket,and re sets all the parameters for the next webview
@@ -168,6 +171,7 @@ class SidebarProvider {
         webviewView.onDidDispose(() => {
             if (this._view === webviewView) {
                 this._view = undefined;
+                this._webview = undefined;
                 this.socket?.disconnect();
                 this.socket = undefined;
                 this.webviewReady = false;
@@ -199,16 +203,15 @@ class SidebarProvider {
             this.workspacePromise = undefined;
             this.workspaceReady = false;
             this.workspaceArchive = undefined;
-            this.socket = createWebSocket(webview, this.logFlow.bind(this));
+            void this.reconnect();
             /**
              * sends nyxus data every time the user connects to the server, bad point because if the 
              * server already has the user data it will still send it
              */
-            this.socket.on('connect', () => {
-                this.workspaceDataSent = false;
-                void this.sendWorkspaceData();
-            });
-            void this.prepareWorkspace();
+            const config = vscode.workspace.getConfiguration('nyxusReplica');
+            if (config.get('enableWorkspaceSync', true) && config.get('workspaceSyncBehavior', 'onSidebarOpen') === 'onSidebarOpen') {
+                void this.prepareWorkspace();
+            }
         } catch (error) {
             this.logFlow('socket.initialization.failed');
             this.output.appendLine(`Connection initialization error type: ${error instanceof Error ? error.name : 'UnknownError'}`);
@@ -256,7 +259,7 @@ class SidebarProvider {
 
                 const config = vscode.workspace.getConfiguration('nyxusReplica');
                 const serverUrl = config.get('url');
-                const apiKey = config.get('apiKey');
+                const apiKey = await require('./api_key_storage').getApiKey(this.context);
                 const userId = config.get('userId');
 
                 if (!apiKey) {
@@ -276,7 +279,8 @@ class SidebarProvider {
                         const { io } = require('socket.io-client');
                         socket = io(serverUrl, {
                             auth: { apiKey },
-                            timeout: 8000,
+                            timeout: config.get('connectionTimeout', 15000),
+                            reconnectionDelay: config.get('reconnectionDelay', 1000),
                             reconnection: false
                         });
                         isTemporary = true;
@@ -284,7 +288,7 @@ class SidebarProvider {
                             const timer = setTimeout(() => {
                                 socket.disconnect();
                                 reject(new Error('Connection timed out.'));
-                            }, 8000);
+                            }, config.get('connectionTimeout', 15000));
                             socket.once('connect', () => {
                                 clearTimeout(timer);
                                 resolve();
@@ -310,7 +314,7 @@ class SidebarProvider {
                         userId,
                         apiKey,
                         workspaceName: folder.name
-                    });
+                    }, config.get('requestTimeout', 15000));
 
                     if (result && result.ok && result.workspace_id) {
                         await saveStoredWorkspaceId(this.context, folder.uri, result.workspace_id);
@@ -399,7 +403,7 @@ class SidebarProvider {
                 this.logFlow('request.chat');
                 this.socket.emit('chat', {
                     prompt,
-                    apikey: config.get('apiKey'),
+                    apikey: await require('./api_key_storage').getApiKey(this.context),
                     
                 });
             } catch (error) {
@@ -411,6 +415,25 @@ class SidebarProvider {
                 });
             }
         });
+    }
+
+    async reconnect() {
+        if (!this._webview) return;
+        const webview = this._webview;
+        const oldSocket = this.socket;
+        try {
+            const socket = await createWebSocket(webview, this.logFlow.bind(this), this.context);
+            if (this._webview !== webview) { socket.disconnect(); return; }
+            this.socket = socket;
+            socket.on('connect', () => {
+                this.workspaceDataSent = false;
+                void this.sendWorkspaceData();
+            });
+            oldSocket?.disconnect();
+        } catch (error) {
+            this.logFlow('socket.initialization.failed');
+            this.output.appendLine(`Connection initialization error type: ${error instanceof Error ? error.name : 'UnknownError'}`);
+        }
     }
 
     /**
@@ -481,7 +504,7 @@ class SidebarProvider {
      * @returns {void}
      */
     dispose() {
-        this.socket?.disconnect();
+            this.socket?.disconnect();
         this.socket = undefined;
     }
 }

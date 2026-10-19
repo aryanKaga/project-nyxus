@@ -7,13 +7,13 @@ const UPLOAD_TIMEOUT_MS = 120000;
  * @param {{ archive: Buffer, fileCount: number, workspaceName: string }} workspaceData
  * @returns {Promise<{ fileCount: number, workspaceName: string, apiKey: string }>}
  */
-async function send_workspace_data(logFlow, workspaceData) {
+async function send_workspace_data(logFlow, workspaceData, context) {
     if (!Buffer.isBuffer(workspaceData?.archive)) {
         throw new Error('The workspace archive has not been prepared.');
     }
 
     const config = vscode.workspace.getConfiguration('nyxusReplica');
-    const apiKey = config.get('apiKey');
+    const apiKey = await require('./api_key_storage').getApiKey(context);
     if (!apiKey) {
         throw new Error('apiKey not configured');
     }
@@ -26,7 +26,7 @@ async function send_workspace_data(logFlow, workspaceData) {
     logFlow('request.workspace_archive');
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), Math.min(config.get('requestTimeout', UPLOAD_TIMEOUT_MS), UPLOAD_TIMEOUT_MS));
 
     let response;
     let rawBody;

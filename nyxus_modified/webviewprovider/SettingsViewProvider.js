@@ -114,7 +114,7 @@ class SettingsViewProvider {
 
         const config = vscode.workspace.getConfiguration('nyxusReplica');
         const serverUrl = config.get('url');
-        const apiKey = config.get('apiKey');
+        const apiKey = await require('./api_key_storage').getApiKey(this.context);
         const userId = config.get('userId');
 
         if (!apiKey) {
@@ -132,7 +132,7 @@ class SettingsViewProvider {
         if (!socket || !socket.connected) {
             try {
                 this.output.appendLine(`Settings: Connecting temporary socket to ${serverUrl}...`);
-                socket = await this._createTemporarySocket(serverUrl, apiKey);
+                socket = await this._createTemporarySocket(serverUrl, apiKey, config.get('connectionTimeout', 15000));
                 isTemporary = true;
             } catch (err) {
                 const message = err instanceof Error ? err.message : String(err);
@@ -152,7 +152,7 @@ class SettingsViewProvider {
                 userId,
                 apiKey,
                 workspaceName: folder.name
-            });
+            }, config.get('requestTimeout', 15000));
 
             if (result && result.ok && result.workspace_id) {
                 await saveStoredWorkspaceId(this.context, folder.uri, result.workspace_id);
@@ -208,18 +208,18 @@ class SettingsViewProvider {
      * @returns {Promise<import('socket.io-client').Socket>}
      * @private
      */
-    _createTemporarySocket(url, apiKey) {
+    _createTemporarySocket(url, apiKey, timeoutMs = 15000) {
         return new Promise((resolve, reject) => {
             const socket = io(url, {
                 auth: { apiKey },
-                timeout: 8000,
+                timeout: timeoutMs,
                 reconnection: false
             });
 
             const timer = setTimeout(() => {
                 socket.disconnect();
                 reject(new Error('Connection attempt timed out.'));
-            }, 8000);
+            }, timeoutMs);
 
             socket.once('connect', () => {
                 clearTimeout(timer);

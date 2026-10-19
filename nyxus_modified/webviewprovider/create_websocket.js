@@ -9,13 +9,16 @@ const path = require('path');
  * @param {*} logFlow 
  * @returns 
  */
-function createWebSocket(webview, logFlow) {
+async function createWebSocket(webview, logFlow, context) {
+    const { getApiKey } = require('./api_key_storage');
     const config = vscode.workspace.getConfiguration('nyxusReplica');
     logFlow(`socket.init url=${config.get('url')}`);
     const socket = io(config.get('url'), {
         auth: {
-            apiKey: config.get('apiKey')
-        }
+            apiKey: await getApiKey(context)
+        },
+        timeout: config.get('connectionTimeout', 15000),
+        reconnectionDelay: config.get('reconnectionDelay', 1000)
     });
     /**
      * 
