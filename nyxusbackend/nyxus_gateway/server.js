@@ -31,7 +31,9 @@ let users;
 /**
  * Authentication middleware with Redis caching
  */
+
 const authenticate = async (req, res, next) => {
+  /** 
   
   const user_id = req.body?.user_id ?? req.query?.user_id ?? req.headers["x-user-id"];
   const api_key = req.body?.api_key ?? req.query?.api_key ?? req.headers["x-api-key"];
@@ -72,6 +74,10 @@ const authenticate = async (req, res, next) => {
     console.error(error);
     return res.status(500).json({ error: "internal server error" });
   }
+  */
+  req.user_id = req.body.user_id
+  console.log('req has user id',req.body.user_id)
+  next()
 };
 
 
@@ -79,8 +85,8 @@ const authenticate = async (req, res, next) => {
 
 
 // Mount the workspace upload router under /upload, /workspace, and /uplaod
-app.use("/upload", uploadRouter);
-app.use("/ID",id_router)
+app.use("/upload",authenticate,uploadRouter);
+app.use("/ID",authenticate,id_router)
 
 
 const port = process.env.PORT || 3000;

@@ -102,7 +102,7 @@ async function requestWorkspaceIdHttp(endpoint, payload, timeoutMs = DEFAULT_ASS
     const rawUrl = typeof endpoint === 'string' ? endpoint : (payload?.serverUrl || 'http://localhost:80');
     const baseUrl = rawUrl.replace(/\/+$/, '');
     console.log(rawUrl)
-    const url = `${baseUrl}/id/request_id`;
+    const url = `${baseUrl}/ID/request_id`;
     const userId = payload?.userId || '123';
     const apiKey = payload?.apiKey || '';
 
