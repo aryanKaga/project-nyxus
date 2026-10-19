@@ -1,0 +1,207 @@
+{
+  "_notes": [
+    "One entry per agent tool. 'command' is appended to the codegraph binary (no shell is used).",
+    "Args with 'positional': true are passed as plain arguments, others use their 'flag'.",
+    "Args with 'path': true are confined to the repo root by the wrapper.",
+    "'json': true appends --json. 'root_flag': true appends --root . (the wrapper runs with cwd = repo root).",
+    "Entries with a 'verify' field use commands or flags that the agent-workflows doc does not fully specify. Check them with `codegraph help advanced` before relying on them."
+  ],
+  "tools": [
+    {
+      "name": "repo_orient",
+      "description": "Compact map of the repo: summary, ranked focus targets, bounded tree, health counts, omitted counts, next commands. Always the first call on a repo. Use budget 'small' first; 'medium' only if small is not enough. Scope to a subdirectory with 'paths'.",
+      "command": ["orient"],
+      "json": true,
+      "root_flag": true,
+      "args": [
+        {"name": "budget", "type": "string", "enum": ["small", "medium"], "flag": "--budget", "description": "Packet size. Default small."},
+        {"name": "paths", "type": "string", "positional": true, "path": true, "description": "Optional subdirectory to scope the map, relative to the repo root."}
+      ]
+    },
+    {
+      "name": "packet_get",
+      "description": "Compact orientation packet for one file (symbols, role, links). Use on the top focus targets from repo_orient.",
+      "command": ["packet", "get"],
+      "json": true,
+      "args": [
+        {"name": "file", "type": "string", "required": true, "positional": true, "path": true, "description": "File path relative to the repo root."},
+        {"name": "max_symbols", "type": "integer", "flag": "--max-symbols", "description": "Cap on symbols returned, e.g. 25."}
+      ]
+    },
+    {
+      "name": "search",
+      "description": "Find targets when you have a query but no file or handle. Returns ranked anchors with stable handles, evidence, neighbors and follow-ups. Mode 'symbol' for symbol-like terms, 'text' when docs or prose should rank higher, 'graph' with from_file for neighbors of a file, 'sql' for SQL objects. Default is hybrid, code-first.",
+      "command": ["search"],
+      "json": true,
+      "args": [
+        {"name": "query", "type": "string", "required": true, "positional": true, "description": "Words or concepts, e.g. 'validate user'."},
+        {"name": "mode", "type": "string", "enum": ["text", "symbol", "sql", "graph"], "flag": "--mode", "description": "Omit for hybrid."},
+        {"name": "from_file", "type": "string", "flag": "--from", "path": true, "description": "Start file for mode 'graph'."},
+        {"name": "depth", "type": "integer", "flag": "--depth", "description": "Hops for mode 'graph'. Keep at 1-2."}
+      ]
+    },
+    {
+      "name": "find_symbol",
+      "description": "Which declaration has this identity? Deterministic lookup by name or 'path::Name'. Returns portable handles to pass to explain, refs and callers. Narrow large results with kind, exported or file_glob.",
+      "command": ["symbols"],
+      "json": true,
+      "root_flag": true,
+      "args": [
+        {"name": "name", "type": "string", "required": true, "positional": true, "description": "Symbol name or 'src/file.ts::Name'."},
+        {"name": "kind", "type": "string", "flag": "--kind", "description": "e.g. function, class, interface."},
+        {"name": "exported", "type": "boolean", "flag": "--exported", "description": "Only exported symbols."},
+        {"name": "file_glob", "type": "string", "flag": "--file-glob", "description": "Project-relative glob, e.g. 'src/api/**'."},
+        {"name": "limit", "type": "integer", "flag": "--limit", "description": "Max results. Keep at or below 50."}
+      ]
+    },
+    {
+      "name": "explain",
+      "description": "Bounded explanation packet for one target: dependencies, references, snippets, duplicate context, follow-ups. Accepts a handle from search or find_symbol, a file path, a symbol name or a SQL object name. Main drill-down tool.",
+      "command": ["explain"],
+      "json": true,
+      "args": [
+        {"name": "target", "type": "string", "required": true, "positional": true, "description": "Handle (preferred), file path or symbol name."}
+      ]
+    },
+    {
+      "name": "refs",
+      "description": "Semantic references to a symbol. For a known symbol, use this or callers instead of explore. Accepts a handle, a search location or a unique exact name. May be incomplete for method calls in some languages.",
+      "command": ["refs"],
+      "json": false,
+      "verify": "Flags and --json support not confirmed in the doc.",
+      "args": [
+        {"name": "target", "type": "string", "required": true, "positional": true, "description": "Handle, location or unique exact name."}
+      ]
+    },
+    {
+      "name": "callers",
+      "description": "Who calls this symbol. For a known symbol, start here or with refs. Caller lists can be a lower bound for method calls in some languages.",
+      "command": ["callers"],
+      "json": false,
+      "verify": "Flags and --json support not confirmed in the doc.",
+      "args": [
+        {"name": "target", "type": "string", "required": true, "positional": true, "description": "Handle or unique exact name."}
+      ]
+    },
+    {
+      "name": "goto",
+      "description": "Jump to a definition. Accepts a handle or a location from search output.",
+      "command": ["goto"],
+      "json": false,
+      "verify": "Flags and --json support not confirmed in the doc.",
+      "args": [
+        {"name": "target", "type": "string", "required": true, "positional": true, "description": "Handle or location."}
+      ]
+    },
+    {
+      "name": "deps",
+      "description": "What a file depends on (outgoing imports). Use for module-level dependency direction.",
+      "command": ["deps"],
+      "json": false,
+      "verify": "Depth/limit flags not confirmed for the CLI; the doc only shows them for the library wrapper.",
+      "args": [
+        {"name": "file", "type": "string", "required": true, "positional": true, "path": true, "description": "File path relative to the repo root."}
+      ]
+    },
+    {
+      "name": "rdeps",
+      "description": "What depends on a file (reverse dependencies). Use to see who consumes a module.",
+      "command": ["rdeps"],
+      "json": false,
+      "verify": "Depth/limit flags not confirmed for the CLI; the doc only shows them for the library wrapper.",
+      "args": [
+        {"name": "file", "type": "string", "required": true, "positional": true, "path": true, "description": "File path relative to the repo root."}
+      ]
+    },
+    {
+      "name": "read_file",
+      "description": "Current source of a file, paged. Use last, for the few nodes that decide the answer. Budgeted (about 5 calls per task). Secret-prone configs return keys only.",
+      "command": ["file"],
+      "json": false,
+      "args": [
+        {"name": "path", "type": "string", "required": true, "positional": true, "path": true, "description": "File path relative to the repo root."},
+        {"name": "offset", "type": "integer", "flag": "--offset", "description": "First line, 1-based."},
+        {"name": "limit", "type": "integer", "flag": "--limit", "description": "Number of lines. 100-200 is usually enough."},
+        {"name": "max_bytes", "type": "integer", "flag": "--max-bytes", "description": "Output byte cap for the page."}
+      ]
+    },
+    {
+      "name": "grep",
+      "description": "Raw text or regex search. Use for log messages, config keys, string literals and anything that is not a symbol.",
+      "command": ["grep"],
+      "json": false,
+      "verify": "Flags not confirmed in the doc.",
+      "args": [
+        {"name": "pattern", "type": "string", "required": true, "positional": true, "description": "Text or regex. Must not start with '-'."}
+      ]
+    },
+    {
+      "name": "explore",
+      "description": "One narrow question answered with context from the top hybrid-search results: anchors, packets, paths, reverse dependencies, candidate tests, follow-ups. Use sparingly. It does not plan subqueries or prove behavior. For a known symbol use refs or callers instead.",
+      "command": ["explore"],
+      "json": true,
+      "root_flag": true,
+      "args": [
+        {"name": "query", "type": "string", "required": true, "positional": true, "description": "A narrow question, e.g. 'how does auth reach db?'."},
+        {"name": "no_source", "type": "boolean", "flag": "--no-source", "description": "Skip source packets to keep output small."}
+      ]
+    },
+    {
+      "name": "doctor",
+      "description": "Diagnose package/runtime problems. Call once if codegraph fails with an install or runtime error. Do not use for normal exploration.",
+      "command": ["doctor"],
+      "json": true,
+      "args": []
+    }
+  ],
+  "builtin_tools": [
+    {
+      "name": "use_skill",
+      "description": "Load the full playbook for a skill by name. Call this before starting a task covered by a skill.",
+      "args": [
+        {"name": "name", "type": "string", "required": true, "description": "Skill name from the available skills list."}
+      ]
+    },
+    {
+      "name": "digest",
+      "description": "Summarize a large stored result (from a truncated tool output) into a short cited summary. Not for exact code, names or counts.",
+      "args": [
+        {"name": "result_id", "type": "string", "required": true, "description": "Id from a '[truncated ... r_xxxx]' note."},
+        {"name": "question", "type": "string", "required": true, "description": "What you need to know from it."},
+        {"name": "max_tokens", "type": "integer", "description": "Default 300."}
+      ]
+    },
+    {
+      "name": "scratchpad",
+      "description": "Save or read working notes: repo root, key handles, conclusions. Use it so old tool output is not needed again.",
+      "args": [
+        {"name": "action", "type": "string", "required": true, "enum": ["set", "get", "list"], "description": "set, get or list."},
+        {"name": "key", "type": "string", "description": "Required for set and get."},
+        {"name": "value", "type": "string", "description": "Required for set."}
+      ]
+    },
+    {
+      "name": "find_files",
+      "description": "Read-only recursive, case-insensitive filename search. Use for requests to find files or folders by name or glob (for example '*harness*' or '*eval*'). Searches basenames under the repository or a confined subdirectory.",
+      "args": [
+        {"name": "pattern", "type": "string", "required": true, "description": "One or more comma-separated filename globs, e.g. '*harness*,*eval*'."},
+        {"name": "directory", "type": "string", "path": true, "description": "Optional repo-relative directory to search. Defaults to the repo root."},
+        {"name": "limit", "type": "integer", "description": "Maximum paths returned, capped at 100. Defaults to 50."}
+      ]
+    },
+    {
+      "name": "run_shell",
+      "description": "Execute a shell command with the workspace as its working directory. Use this to perform requested workspace inspections and operations rather than telling the user to run the command. Commands can modify files and are not sandboxed to the workspace.",
+      "args": [
+        {"name": "command", "type": "string", "required": true, "description": "Shell command to execute. It runs in the workspace directory and is subject to the configured timeout, tool-call budget, and output cap."}
+      ]
+    },
+    {
+      "name": "create_architecture_diagram",
+      "description": "Create a standalone HTML architecture diagram only when the user asks for an architecture diagram, architecture overview visualization, or architectural flow chart. Lazily invokes an architecture analyst subagent to inspect the requested repository scope using read-only tools, then a specialist HTML diagram writer. The completed HTML is delivered to VS Code and opened automatically.",
+      "args": [
+        {"name": "question", "type": "string", "required": true, "description": "The user's requested architecture diagram scope and details. Include the whole repository or the specifically requested subsystem/flow."}
+      ]
+    }
+  ]
+}
