@@ -114,6 +114,13 @@ export default function Setting({ onBack }) {
           setStatusMsg({ type: "info", text: "Workspace ID cleared for this folder." });
           break;
 
+        case "workspace_git_action_result":
+          setLoading(false);
+          setStatusMsg(message.ok
+            ? { type: "success", text: message.action === "stage_workspace" ? "Workspace staged." : "Workspace unstaged." }
+            : { type: "error", text: message.error || "Workspace staging failed." });
+          break;
+
         default:
           break;
       }
@@ -128,9 +135,16 @@ export default function Setting({ onBack }) {
   }, []);
 
   const handleRequestWorkspaceId = () => {
+    if (workspaceInfo.workspaceId) return;
     setLoading(true);
     setStatusMsg({ type: "info", text: "Requesting Workspace ID from server..." });
     vscode.postMessage({ type: "request_workspace_id" });
+  };
+
+  const handleWorkspaceGitAction = (type) => {
+    setLoading(true);
+    setStatusMsg({ type: "info", text: type === "stage_workspace" ? "Staging workspace..." : "Unstaging workspace..." });
+    vscode.postMessage({ type });
   };
 
   const handleSaveWorkspaceMetadata = (e) => {
@@ -284,7 +298,7 @@ export default function Setting({ onBack }) {
           <button
             type="button"
             className="vscode-settings-primary-btn"
-            disabled={loading}
+            disabled={loading || Boolean(workspaceInfo.workspaceId)}
             onClick={handleRequestWorkspaceId}
             title="Request a Workspace ID for this project folder"
           >
@@ -294,7 +308,7 @@ export default function Setting({ onBack }) {
                 <span>Requesting...</span>
               </>
             ) : workspaceInfo.workspaceId ? (
-              "Reassign Workspace ID"
+              "Workspace ID Assigned"
             ) : (
               "Request Workspace ID"
             )}
@@ -403,7 +417,7 @@ export default function Setting({ onBack }) {
                     <button
                       type="button"
                       className="vscode-settings-primary-btn"
-                      disabled={loading}
+                      disabled={loading || Boolean(workspaceInfo.workspaceId)}
                       onClick={handleRequestWorkspaceId}
                     >
                       {loading ? (
@@ -412,23 +426,16 @@ export default function Setting({ onBack }) {
                           <span>Requesting Workspace ID...</span>
                         </>
                       ) : workspaceInfo.workspaceId ? (
-                        "Reassign Workspace ID"
+                        "Workspace ID Assigned"
                       ) : (
                         "Request Workspace ID"
                       )}
                     </button>
 
-                    {workspaceInfo.workspaceId && (
-                      <button
-                        type="button"
-                        className="vscode-setting-danger-btn"
-                        onClick={handleClearWorkspaceId}
-                        disabled={loading}
-                        title="Clear stored Workspace ID"
-                      >
-                        Clear
-                      </button>
-                    )}
+                  </div>
+                  <div className="vscode-setting-actions">
+                    <button type="button" className="vscode-setting-action-btn" disabled={loading} onClick={() => handleWorkspaceGitAction("stage_workspace")}>Stage Workspace</button>
+                    <button type="button" className="vscode-setting-action-btn" disabled={loading} onClick={() => handleWorkspaceGitAction("unstage_workspace")}>Unstage Workspace</button>
                   </div>
                 </div>
               )}

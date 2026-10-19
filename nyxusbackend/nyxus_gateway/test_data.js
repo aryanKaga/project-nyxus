@@ -18,6 +18,9 @@ const result = await users.updateOne(
             user_id,
             workspace_id: [],
             api_key: []
+        },
+        $set:{
+          max_limit:3
         }
     },
     { upsert: true }

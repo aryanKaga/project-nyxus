@@ -333,6 +333,11 @@ class SidebarProvider {
                     return;
                 }
 
+                if (getStoredWorkspaceId(this.context, folder.uri)) {
+                    this.sendMessage({ type: 'assign_workspace_id_result', ok: false, error: 'This workspace already has a permanent ID.' });
+                    return;
+                }
+
                 const config = vscode.workspace.getConfiguration('nyxusReplica');
                 const serverUrl = config.get('url');
                 const apiKey = await getApiKey(this.context);

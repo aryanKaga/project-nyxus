@@ -57,7 +57,26 @@ class SettingsViewProvider {
                     break;
                 }
                 case 'request_workspace_id': {
+                    const activeFolder = vscode.workspace.workspaceFolders?.[0];
+                    if (activeFolder && getStoredWorkspaceId(this.context, activeFolder.uri)) {
+                        this.sendMessage({ type: 'assign_workspace_id_result', ok: false, error: 'This workspace already has a permanent ID.' });
+                        break;
+                    }
                     await this._handleRequestWorkspaceId();
+                    break;
+                }
+                case 'stage_workspace':
+                case 'unstage_workspace': {
+                    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+                    try {
+                        if (!workspaceRoot) throw new Error('Open a workspace folder first.');
+                        const { stageWorkspace, unstageWorkspace } = require('./workspace_archive');
+                        if (message.type === 'stage_workspace') await stageWorkspace(workspaceRoot);
+                        else await unstageWorkspace(workspaceRoot);
+                        this.sendMessage({ type: 'workspace_git_action_result', ok: true, action: message.type });
+                    } catch (error) {
+                        this.sendMessage({ type: 'workspace_git_action_result', ok: false, action: message.type, error: error instanceof Error ? error.message : String(error) });
+                    }
                     break;
                 }
                 case 'clear_workspace_id': {
