@@ -155,14 +155,16 @@ class SidebarProvider {
         this._view = webviewView;
         const webview = webviewView.webview;
         const distUri = vscode.Uri.joinPath(this.extensionUri, 'webview-ui', 'dist');
-
+        /**
+         * every time a webview closes it disconnects with the socket,and re sets all the parameters for the next webview
+         */
         webviewView.onDidDispose(() => {
             if (this._view === webviewView) {
                 this._view = undefined;
                 this.socket?.disconnect();
                 this.socket = undefined;
                 this.webviewReady = false;
-                this.workspaceDataSent = false;
+            
             }
         });
 
@@ -182,9 +184,16 @@ class SidebarProvider {
         }
 
         try {
+            /**
+             * when ever a  new socket arrives it disconnects with the server  amd starts fresh
+             */
             this.socket?.disconnect();
             this.workspaceDataSent = false;
             this.socket = createWebSocket(webview, this.logFlow.bind(this));
+            /**
+             * sends nyxus data every time the user connects to the server, bad point because if the 
+             * server already has the user data it will still send it
+             */
             this.socket.on('connect', () => {
                 this.workspaceDataSent = false;
                 void this.sendWorkspaceData();

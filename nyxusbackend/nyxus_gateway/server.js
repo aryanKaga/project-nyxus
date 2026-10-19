@@ -25,22 +25,13 @@ app.use(express.json({ limit: "250mb" }));
 app.use(express.urlencoded({ extended: true, limit: "250mb" }));
 
 
-let mongo_db = await init_database()
-let users = mongo_db.collection("users");
-
-if(!mongo_db){
-  throw new error('Database init Failed')
-  console.error('database couldnt be initialized')
-}
-else{
-  'Database started'
-}
+let users;
 
 /**
  * Authentication middleware with Redis caching
  */
 const authenticate = async (req, res, next) => {
-  next()
+  
   const user_id = req.body?.user_id ?? req.query?.user_id ?? req.headers["x-user-id"];
   const api_key = req.body?.api_key ?? req.query?.api_key ?? req.headers["x-api-key"];
 
@@ -84,7 +75,7 @@ const authenticate = async (req, res, next) => {
 
 
 //
-app.use('/',authenticate)
+
 
 // Mount the workspace upload router under /upload, /workspace, and /uplaod
 app.use("/upload", uploadRouter);
@@ -96,7 +87,8 @@ const port = process.env.PORT || 3000;
 try {
   await redis.connect();
   await client.connect();
-  users = await init_database();
+  const mongo_db = await init_database();
+  users = mongo_db.collection("users");
   console.log("starting the server");
   app.listen(port, () => {
     console.log(`Gateway listening on port ${port}`);
