@@ -32,8 +32,9 @@ async function send_workspace_data(logFlow, workspaceData) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+                user_id:"123",/**this is only for testing pupose remove it in production scenarios */
                 api_key: apiKey,
-                workspace_name: workspaceData.workspaceName,
+                workspace_id: workspaceData.workspaceName,
                 archive: workspaceData.archive.toString('base64')
             }),
             signal: controller.signal

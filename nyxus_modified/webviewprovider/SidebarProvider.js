@@ -121,7 +121,8 @@ class SidebarProvider {
             const result = await send_workspace_data(this.logFlow.bind(this), {
                 archive: this.workspaceArchive,
                 fileCount: this.workspaceFileCount,
-                workspaceName: this.workspaceName
+                workspaceName: this.workspaceName,
+                workspace_id:123
             });
             this.workspaceDataSent = true;
             this.workspaceStatus = {
