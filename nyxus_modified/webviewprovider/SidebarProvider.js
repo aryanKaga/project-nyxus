@@ -9,6 +9,7 @@ const { createFlowLogger } = require('./flowLogger');
 const { getStoredWorkspaceId, saveStoredWorkspaceId, clearStoredWorkspaceId, getStoredWorkspaceMeta, saveStoredWorkspaceMeta } = require('./workspace_storage');
 const { requestWorkspaceIdAssignment } = require('./assign_workspace_request');
 const { getApiKey, setApiKey } = require('./api_key_storage');
+const { getUserId, setUserId } = require('./user_id_storage');
 
 
 class SidebarProvider {
@@ -245,6 +246,7 @@ class SidebarProvider {
                 const workspaceId = folderUri && this.context ? (getStoredWorkspaceId(this.context, folderUri) || '') : '';
                 const meta = folderUri && this.context ? getStoredWorkspaceMeta(this.context, folderUri) : { customName: '', description: '' };
                 const apiKey = await getApiKey(this.context);
+                const userId = await getUserId(this.context);
                 this.sendMessage({
                     type: 'workspace_info',
                     folderName,
@@ -253,8 +255,21 @@ class SidebarProvider {
                     customName: meta.customName,
                     description: meta.description,
                     apiKey,
-                    hasApiKey: Boolean(apiKey)
+                    hasApiKey: Boolean(apiKey),
+                    userId,
+                    user_id: userId
                 });
+                return;
+            }
+
+            if (message.type === 'save_user_id') {
+                const userId = typeof message.userId === 'string' ? message.userId.trim() : '123';
+                try {
+                    await setUserId(this.context, userId);
+                    this.sendMessage({ type: 'save_user_id_result', ok: true, userId });
+                } catch (error) {
+                    this.sendMessage({ type: 'save_user_id_result', ok: false, error: error instanceof Error ? error.message : String(error) });
+                }
                 return;
             }
 
@@ -320,8 +335,8 @@ class SidebarProvider {
 
                 const config = vscode.workspace.getConfiguration('nyxusReplica');
                 const serverUrl = config.get('url');
-                const apiKey = await require('./api_key_storage').getApiKey(this.context);
-                const userId = config.get('userId');
+                const apiKey = await getApiKey(this.context);
+                const userId = await getUserId(this.context);
 
                 if (!apiKey) {
                     this.sendMessage({
@@ -332,49 +347,12 @@ class SidebarProvider {
                     return;
                 }
 
-                let socket = this.socket;
-                let isTemporary = false;
-
-                if (!socket || !socket.connected) {
-                    try {
-                        const { io } = require('socket.io-client');
-                        socket = io(serverUrl, {
-                            auth: { apiKey },
-                            timeout: config.get('connectionTimeout', 15000),
-                            reconnectionDelay: config.get('reconnectionDelay', 1000),
-                            reconnection: false
-                        });
-                        isTemporary = true;
-                        await new Promise((resolve, reject) => {
-                            const timer = setTimeout(() => {
-                                socket.disconnect();
-                                reject(new Error('Connection timed out.'));
-                            }, config.get('connectionTimeout', 15000));
-                            socket.once('connect', () => {
-                                clearTimeout(timer);
-                                resolve();
-                            });
-                            socket.once('connect_error', (err) => {
-                                clearTimeout(timer);
-                                socket.disconnect();
-                                reject(err);
-                            });
-                        });
-                    } catch (err) {
-                        this.sendMessage({
-                            type: 'assign_workspace_id_result',
-                            ok: false,
-                            error: `Could not connect to Nyxus server: ${err.message}`
-                        });
-                        return;
-                    }
-                }
-
                 try {
                     const meta = folder && this.context ? getStoredWorkspaceMeta(this.context, folder.uri) : { customName: '', description: '' };
-                    const result = await requestWorkspaceIdAssignment(socket, {
+                    const result = await requestWorkspaceIdAssignment(serverUrl, {
                         userId,
                         apiKey,
+                        serverUrl,
                         workspaceName: meta.customName || folder.name,
                         customName: meta.customName,
                         description: meta.description
@@ -397,10 +375,6 @@ class SidebarProvider {
                         ok: false,
                         error: error instanceof Error ? error.message : String(error)
                     });
-                } finally {
-                    if (isTemporary && socket) {
-                        socket.disconnect();
-                    }
                 }
                 return;
             }
@@ -461,14 +435,16 @@ class SidebarProvider {
             }
 
             try {
-                const config = vscode.workspace.getConfiguration('nyxusReplica');
-                
+                const apiKey = await require('./api_key_storage').getApiKey(this.context);
+                const userId = await getUserId(this.context);
 
                 this.logFlow('request.chat');
                 this.socket.emit('chat', {
                     prompt,
-                    apikey: await require('./api_key_storage').getApiKey(this.context),
-                    
+                    apikey: apiKey,
+                    apiKey: apiKey,
+                    user_id: userId,
+                    userId: userId,
                 });
             } catch (error) {
                 this.logFlow('request.chat.failed');

@@ -5,8 +5,9 @@ const {
     ASSIGN_EVENT
 } = require('../../webviewprovider/assign_workspace_request');
 
+// When passed a socket-like object (has .emit), uses Socket.IO path
 test('requestWorkspaceIdAssignment rejects if socket is not connected', async () => {
-    const socket = { connected: false };
+    const socket = { connected: false, emit() {} };
     await assert.rejects(
         () => requestWorkspaceIdAssignment(socket, {
             userId: 'user-1',
@@ -18,7 +19,7 @@ test('requestWorkspaceIdAssignment rejects if socket is not connected', async ()
 });
 
 test('requestWorkspaceIdAssignment rejects if apiKey is missing', async () => {
-    const socket = { connected: true };
+    const socket = { connected: true, emit() {} };
     await assert.rejects(
         () => requestWorkspaceIdAssignment(socket, {
             userId: 'user-1',
@@ -52,10 +53,11 @@ test('requestWorkspaceIdAssignment emits assign_workspace_id and resolves on val
     assert.deepEqual(emittedPayload, {
         apiKey: 'test-key',
         apikey: 'test-key',
+        user_id: 'test-user-id',
+        userId: 'test-user-id',
         workspace_name: 'my-project',
         custom_name: 'my-project',
-        description: '',
-        user_id: 'test-user-id'
+        description: ''
     });
     assert.deepEqual(result, {
         ok: true,
@@ -121,6 +123,8 @@ test('requestWorkspaceIdAssignment handles customName, description, and workspac
     assert.deepEqual(capturedData, {
         apiKey: 'secret-key',
         apikey: 'secret-key',
+        user_id: '123',
+        userId: '123',
         workspace_name: 'Custom Service',
         custom_name: 'Custom Service',
         description: 'Microservice description',

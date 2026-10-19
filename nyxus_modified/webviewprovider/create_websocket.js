@@ -11,11 +11,17 @@ const path = require('path');
  */
 async function createWebSocket(webview, logFlow, context) {
     const { getApiKey } = require('./api_key_storage');
+    const { getUserId } = require('./user_id_storage');
     const config = vscode.workspace.getConfiguration('nyxusReplica');
+    const apiKey = await getApiKey(context);
+    const userId = await getUserId(context);
     logFlow(`socket.init url=${config.get('url')}`);
     const socket = io(config.get('url'), {
         auth: {
-            apiKey: await getApiKey(context)
+            apiKey,
+            apikey: apiKey,
+            userId,
+            user_id: userId
         },
         timeout: config.get('connectionTimeout', 15000),
         reconnectionDelay: config.get('reconnectionDelay', 1000)
@@ -131,14 +137,18 @@ async function createWebSocket(webview, logFlow, context) {
                 request_id: requestId,
                 response: fileData ? 'ok' : 'err',
                 file_data: fileData || '',
-                file_name: fileName
+                file_name: fileName,
+                user_id: userId,
+                userId: userId
             });
             logFlow('request.file_content_response');
         } catch {
             logFlow('request.file_content_response.failed');
             socket.emit('file_content_response', {
                 request_id: requestId,
-                response: 'err'
+                response: 'err',
+                user_id: userId,
+                userId: userId
             });
         }
     });

@@ -1,7 +1,6 @@
 const vscode = require('vscode');
 const path = require('path');
 const fs = require('fs');
-const { io } = require('socket.io-client');
 const { getStoredWorkspaceId, saveStoredWorkspaceId, clearStoredWorkspaceId } = require('./workspace_storage');
 const { requestWorkspaceIdAssignment } = require('./assign_workspace_request');
 
@@ -9,13 +8,11 @@ class SettingsViewProvider {
     /**
      * @param {import('vscode').ExtensionContext} context
      * @param {import('vscode').OutputChannel} output
-     * @param {(() => import('socket.io-client').Socket | undefined)} [getActiveSocket]
      */
-    constructor(context, output, getActiveSocket) {
+    constructor(context, output) {
         this.context = context;
         this.extensionUri = context.extensionUri;
         this.output = output;
-        this.getActiveSocket = getActiveSocket;
         /** @type {import('vscode').WebviewView | undefined} */
         this._view = undefined;
     }
@@ -56,7 +53,7 @@ class SettingsViewProvider {
 
             switch (message.type) {
                 case 'get_workspace_info': {
-                    this._sendWorkspaceInfo();
+                    await this._sendWorkspaceInfo();
                     break;
                 }
                 case 'request_workspace_id': {
@@ -74,10 +71,10 @@ class SettingsViewProvider {
     }
 
     /**
-     * Sends the current workspace details and stored ID to the webview.
+     * Sends the current workspace details, stored ID, userId, and apiKey to the webview.
      * @private
      */
-    _sendWorkspaceInfo() {
+    async _sendWorkspaceInfo() {
         const folder = vscode.workspace.workspaceFolders?.[0];
         const folderUri = folder?.uri;
         const folderName = folder?.name || '';
@@ -85,7 +82,8 @@ class SettingsViewProvider {
         const workspaceId = folderUri && this.context ? (getStoredWorkspaceId(this.context, folderUri) || '') : '';
         const config = vscode.workspace.getConfiguration('nyxusReplica');
         const serverUrl = config.get('url') || '';
-        const userId = config.get('userId') || '';
+        const userId = await require('./user_id_storage').getUserId(this.context);
+        const apiKey = await require('./api_key_storage').getApiKey(this.context);
 
         this.sendMessage({
             type: 'workspace_info',
@@ -93,12 +91,15 @@ class SettingsViewProvider {
             folderPath,
             workspaceId,
             serverUrl,
-            userId
+            userId,
+            user_id: userId,
+            apiKey,
+            hasApiKey: Boolean(apiKey)
         });
     }
 
     /**
-     * Connects (or reuses active socket) and requests a workspace ID assignment from the server.
+     * Sends an HTTP POST to /ID/request_id to obtain a workspace ID.
      * @private
      */
     async _handleRequestWorkspaceId() {
@@ -115,7 +116,7 @@ class SettingsViewProvider {
         const config = vscode.workspace.getConfiguration('nyxusReplica');
         const serverUrl = config.get('url');
         const apiKey = await require('./api_key_storage').getApiKey(this.context);
-        const userId = config.get('userId');
+        const userId = await require('./user_id_storage').getUserId(this.context);
 
         if (!apiKey) {
             this.sendMessage({
@@ -126,31 +127,12 @@ class SettingsViewProvider {
             return;
         }
 
-        let socket = typeof this.getActiveSocket === 'function' ? this.getActiveSocket() : undefined;
-        let isTemporary = false;
-
-        if (!socket || !socket.connected) {
-            try {
-                this.output.appendLine(`Settings: Connecting temporary socket to ${serverUrl}...`);
-                socket = await this._createTemporarySocket(serverUrl, apiKey, config.get('connectionTimeout', 15000));
-                isTemporary = true;
-            } catch (err) {
-                const message = err instanceof Error ? err.message : String(err);
-                this.output.appendLine(`Settings socket connection failed: ${message}`);
-                this.sendMessage({
-                    type: 'assign_workspace_id_result',
-                    ok: false,
-                    error: `Could not connect to Nyxus server: ${message}`
-                });
-                return;
-            }
-        }
-
         try {
-            this.output.appendLine(`Settings: Requesting workspace ID for folder "${folder.name}"...`);
-            const result = await requestWorkspaceIdAssignment(socket, {
+            this.output.appendLine(`Settings: Requesting workspace ID for folder "${folder.name}" via HTTP...`);
+            const result = await requestWorkspaceIdAssignment(serverUrl, {
                 userId,
                 apiKey,
+                serverUrl,
                 workspaceName: folder.name
             }, config.get('requestTimeout', 15000));
 
@@ -174,14 +156,6 @@ class SettingsViewProvider {
                 ok: false,
                 error: detail
             });
-        } finally {
-            if (isTemporary && socket) {
-                try {
-                    socket.disconnect();
-                } catch {
-                    // Ignore disconnect error on cleanup
-                }
-            }
         }
     }
 
@@ -203,38 +177,6 @@ class SettingsViewProvider {
     }
 
     /**
-     * @param {string} url
-     * @param {string} apiKey
-     * @returns {Promise<import('socket.io-client').Socket>}
-     * @private
-     */
-    _createTemporarySocket(url, apiKey, timeoutMs = 15000) {
-        return new Promise((resolve, reject) => {
-            const socket = io(url, {
-                auth: { apiKey },
-                timeout: timeoutMs,
-                reconnection: false
-            });
-
-            const timer = setTimeout(() => {
-                socket.disconnect();
-                reject(new Error('Connection attempt timed out.'));
-            }, timeoutMs);
-
-            socket.once('connect', () => {
-                clearTimeout(timer);
-                resolve(socket);
-            });
-
-            socket.once('connect_error', (error) => {
-                clearTimeout(timer);
-                socket.disconnect();
-                reject(error);
-            });
-        });
-    }
-
-    /**
      * @param {import('vscode').Webview} webview
      * @param {import('vscode').Uri} distUri
      * @returns {string}
@@ -248,9 +190,9 @@ class SettingsViewProvider {
         }
 
         let html = fs.readFileSync(indexPath, 'utf8').replace(
-            /(src|href)="(\.?\/assets\/[^"]+)"/g,
+            /(src|href)="(\\.?\\/assets\\/[^"]+)"/g,
             (_, attribute, assetPath) => {
-                const cleanPath = assetPath.replace(/^\.?\//, '');
+                const cleanPath = assetPath.replace(/^\\.?\\//, '');
                 const fileUri = vscode.Uri.file(path.join(distPath, cleanPath));
                 return `${attribute}="${webview.asWebviewUri(fileUri)}"`;
             }

@@ -1,38 +1,30 @@
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
+import { init_database } from "./MonogoClient.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const db = await init_database();
+const users = db.collection("users");
 
-// Read the real workspace zip produced earlier, or fall back to a tiny stub
-let zipBuffer;
-const testZip = path.join(__dirname, "test_workspace.zip");
-if (fs.existsSync(testZip)) {
-  zipBuffer = fs.readFileSync(testZip);
-  console.log(`Using zip: ${testZip} (${zipBuffer.length} bytes)`);
-} else {
-  // Create a 1-file in-memory zip so the test works without a real zip
-  const { execSync } = await import("child_process");
-  const tmpFile = "/tmp/test_ws_file.txt";
-  const tmpZip  = "/tmp/test_ws.zip";
-  fs.writeFileSync(tmpFile, "hello nyxus");
-  execSync(`zip -j "${tmpZip}" "${tmpFile}"`);
-  zipBuffer = fs.readFileSync(tmpZip);
-  console.log(`Created stub zip (${zipBuffer.length} bytes)`);
-}
+const user_id = "123";
+const user_name = "";
+const email = "";
 
-const response = await fetch("http://localhost:3000/upload", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",  // ← required so express parses the body
-  },
-  body: JSON.stringify({
-    user_id:      "101",
-    api_key:      "abc_123",
-    workspace_id: "12345",
-    archive:      zipBuffer.toString("base64"),  // ← base64-encoded zip
-  }),
+const result = await users.updateOne(
+    { user_id },
+    {
+        $set: {
+            user_name,
+            email
+        },
+        $setOnInsert: {
+            user_id,
+            workspace_id: [],
+            api_key: []
+        }
+    },
+    { upsert: true }
+);
+
+console.log({
+    matchedCount: result.matchedCount,
+    modifiedCount: result.modifiedCount,
+    upsertedId: result.upsertedId
 });
-
-console.log("Status:", response.status);
-console.log("Response:", await response.json());

@@ -64,7 +64,7 @@
         },
         "nyxusReplica.userId": {
           "type": "string",
-          "default": "8f2c6e91-4a73-4db8-9c15-2e6b7a0d3f84",
+          "default": "123",
           "scope": "machine",
           "description": "User ID sent with Nyxus workspace requests."
         },

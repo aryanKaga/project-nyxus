@@ -18,10 +18,11 @@ async function send_workspace_data(logFlow, workspaceData, context) {
         throw new Error('apiKey not configured');
     }
 
-    const uploadUrl = config.get('url') + '/upload';
+    const baseUrl = (config.get('url') || 'http://localhost:80').replace(/\/+$/, '');
+    const uploadUrl = baseUrl + '/upload';
 
-    const userId = config.get('userId') || '8f2c6e91-4a73-4db8-9c15-2e6b7a0d3f84';
-    const workspaceId = workspaceData?.workspace_id || workspaceData?.workspaceId || '8f2c6e91-4a73-4db8-9c15-2e6b7a0d3f84';
+    const userId = await require('./user_id_storage').getUserId(context);
+    const workspaceId = workspaceData?.workspace_id || workspaceData?.workspaceId || '';
 
     logFlow('request.workspace_archive');
 
@@ -33,10 +34,16 @@ async function send_workspace_data(logFlow, workspaceData, context) {
     try {
         response = await fetch(uploadUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'x-user-id': userId,
+                'x-api-key': apiKey
+            },
             body: JSON.stringify({
                 user_id: userId,
+                userId: userId,
                 api_key: apiKey,
+                apiKey: apiKey,
                 workspace_id: workspaceId,
                 workspace_name: workspaceData.workspaceName || '',
                 custom_name: workspaceData.customName || workspaceData.workspaceName || '',
