@@ -1,7 +1,16 @@
 import express from "express";
 import { unpackWorkspaceWithPython } from "./ingestion/ingest.js";
 
+import getMongoStore from "./MongoStore.js";
+
+
+
+
 const upload = express.Router();
+const mongostore = getMongoStore()
+
+
+
 
 // Helper to extract archive data from body or raw buffer
 function getArchivePayload(req) {
@@ -10,33 +19,35 @@ function getArchivePayload(req) {
     }
     return req.body?.archive || req.body?.workspace || req.body?.zip || req.body?.file || null;
 }
+/**
+ * using workspace collection to upload files and archives
+ */
 
 /**
+
+const handleWorkspaceUpload = async (req, res) => {
+    try {
+        
+        const {user_id,api_key,workspace_id} = req.body
+        if(!user_id || !api_key || !workspace_id){
+            return res.status(401).json({
+         
  * Handle workspace upload and run the Python ingestion pipeline.
  * Supports /workspace, /upload, and / (when mounted under /upload or /workspace)
  */
+
+
 const handleWorkspaceUpload = async (req, res) => {
+    console.log('workspace request reacheed,' ,req)
     try {
-        const user_id =
-            req.body?.user_id ??
-            req.query?.user_id ??
-            req.params?.user_id ??
-            req.headers["x-user-id"];
-
-        const api_key =
-            req.body?.api_key ??
-            req.body?.apiKey ??
-            req.query?.api_key ??
-            req.params?.api_key ??
-            req.headers["x-api-key"];
-
-        const workspace_id =
-            req.body?.workspace_id ??
-            req.query?.workspace_id ??
-            req.params?.workspace_id ??
-            req.headers["x-workspace-id"] ??
-            null;
-
+        
+        const {user_id,api_key,workspace_id} = req.body
+        if(!user_id || !api_key || !workspace_id){
+            return res.status(401).json({
+                error:"invalid credentials"
+            })
+        }
+        
         const archive = getArchivePayload(req);
 
         if (!archive) {
@@ -52,6 +63,7 @@ const handleWorkspaceUpload = async (req, res) => {
         const result = await unpackWorkspaceWithPython(archive, {
             workspace_id,
         });
+        await mongostore.saveWorkspace(api_key, workspace_id, archive, result.file_count) 
 
         console.log(`[Upload] Ingestion successful. Workspace ID: ${result.workspace_id}, Files: ${result.file_count}`);
 
@@ -71,6 +83,9 @@ const handleWorkspaceUpload = async (req, res) => {
 };
 
 // Mount route handlers
+upload.use('/',(req,res,next)=>{
+    console.log('request came')
+})
 upload.post("/workspace", handleWorkspaceUpload);
 upload.post("/upload", handleWorkspaceUpload);
 upload.post("/", handleWorkspaceUpload);

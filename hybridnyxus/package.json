@@ -46,7 +46,7 @@
       "properties": {
         "nyxusReplica.url": {
           "type": "string",
-          "default": "http://localhost:3000",
+          "default": "http://localhost:5000",
           "description": "URL of the Nyxus workspace receiver."
         },
         "nyxusReplica.apiKey": {

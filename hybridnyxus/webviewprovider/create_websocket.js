@@ -11,7 +11,9 @@ const path = require('path');
  */
 function createWebSocket(webview, logFlow) {
     const config = vscode.workspace.getConfiguration('nyxusReplica');
-    const socket = io(config.get('url'), {
+    const serverUrl = config.get('url');
+    logFlow(`socket.initializing: ${serverUrl}`);
+    const socket = io(serverUrl, {
         auth: {
             apiKey: config.get('apiKey')
         }
@@ -46,8 +48,8 @@ function createWebSocket(webview, logFlow) {
         });
     });
 
-    socket.on('connect_error', () => {
-        logFlow('socket.connect_error');
+    socket.on('connect_error', (error) => {
+        logFlow(`socket.connect_error: ${error.message}`);
         postMessage({
             type: 'connection_status',
             status: 'disconnected',

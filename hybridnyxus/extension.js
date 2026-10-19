@@ -19,7 +19,7 @@ function activate(context) {
          */
         resolveWebviewView(webviewView) {
             const webview = webviewView.webview;
-            webview.options = { enableScripts: false };
+          
             webview.html = '<!DOCTYPE html><html><body><p>Starting Nyxus…</p></body></html>';
 
             initializationTimer = setTimeout(() => {

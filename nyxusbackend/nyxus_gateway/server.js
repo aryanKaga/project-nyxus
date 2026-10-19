@@ -18,21 +18,29 @@ redis.on("error", (err) => {
 
 const SESSION_TTL = 90; // seconds
 const app = express();
-const router = express.Router();
+
 
 // Allow up to 250MB for workspace zip uploads
 app.use(express.json({ limit: "250mb" }));
 app.use(express.urlencoded({ extended: true, limit: "250mb" }));
 
 
-monogo_db = await init_database()
-const users = db.collection("users");
+let mongo_db = await init_database()
+let users = mongo_db.collection("users");
 
+if(!mongo_db){
+  throw new error('Database init Failed')
+  console.error('database couldnt be initialized')
+}
+else{
+  'Database started'
+}
 
 /**
  * Authentication middleware with Redis caching
  */
 const authenticate = async (req, res, next) => {
+  next()
   const user_id = req.body?.user_id ?? req.query?.user_id ?? req.headers["x-user-id"];
   const api_key = req.body?.api_key ?? req.query?.api_key ?? req.headers["x-api-key"];
 
@@ -74,29 +82,14 @@ const authenticate = async (req, res, next) => {
   }
 };
 
-// Root auth verification route
-router.post("/auth", authenticate, (req, res) => {
-  return res.status(200).json({ ok: true, user_id: req.user.user_id });
-});
 
-router.get("/auth", authenticate, (req, res) => {
-  return res.status(200).json({ ok: true, user_id: req.user.user_id });
-});
-
-// Delete workspace route
-router.post("/delete", authenticate, async (req, res) => {
-  const { user_id, api_key, workspace_id } = req.body ?? req.query ?? {};
-  console.log("received delete request for workspace:", workspace_id);
-  return res.status(200).json({ ok: true, message: `workspace ${workspace_id} deleted` });
-});
+//
+app.use('/',authenticate)
 
 // Mount the workspace upload router under /upload, /workspace, and /uplaod
 app.use("/upload", uploadRouter);
 app.use("/workspace", uploadRouter);
-app.use("/uplaod", uploadRouter);
 
-// Mount main router
-app.use(router);
 
 const port = process.env.PORT || 3000;
 
