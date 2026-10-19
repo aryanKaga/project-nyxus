@@ -66,15 +66,7 @@ class SettingsViewProvider {
                     break;
                 }
                 case 'stage_workspace': {
-                    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-                    try {
-                        if (!workspaceRoot) throw new Error('Open a workspace folder first.');
-                        const { stageWorkspace } = require('./workspace_archive');
-                        await stageWorkspace(workspaceRoot);
-                        this.sendMessage({ type: 'workspace_git_action_result', ok: true, action: 'stage_workspace' });
-                    } catch (error) {
-                        this.sendMessage({ type: 'workspace_git_action_result', ok: false, action: 'stage_workspace', error: error instanceof Error ? error.message : String(error) });
-                    }
+                    await this._handleStageWorkspace(message);
                     break;
                 }
                 case 'unstage_workspace': {
@@ -175,6 +167,77 @@ class SettingsViewProvider {
             this.sendMessage({
                 type: 'assign_workspace_id_result',
                 ok: false,
+                error: detail
+            });
+        }
+    }
+
+    /**
+     * Stages the workspace: packages git archive and triggers send_workspace_data with user_id, workspace_id, etc.
+     * @param {object} [message]
+     * @private
+     */
+    async _handleStageWorkspace(message) {
+        const folder = vscode.workspace.workspaceFolders?.[0];
+        if (!folder) {
+            this.sendMessage({
+                type: 'workspace_git_action_result',
+                ok: false,
+                action: 'stage_workspace',
+                error: 'Open a workspace folder first.'
+            });
+            return;
+        }
+
+        const workspaceRoot = folder.uri.fsPath;
+        const workspaceId = (folder && this.context ? getStoredWorkspaceId(this.context, folder.uri) : '') || message?.workspaceId || '';
+        if (!workspaceId) {
+            this.sendMessage({
+                type: 'workspace_git_action_result',
+                ok: false,
+                action: 'stage_workspace',
+                error: 'No Workspace ID assigned. Please request a Workspace ID before staging.'
+            });
+            return;
+        }
+
+        try {
+            this.output.appendLine(`Staging workspace: archiving files for ${workspaceRoot}...`);
+            const { create_workspace_archive } = require('./workspace_archive');
+            const archiveResult = await create_workspace_archive(workspaceRoot);
+
+            const meta = folder && this.context ? getStoredWorkspaceMeta(this.context, folder.uri) : { customName: '', description: '' };
+            const { send_workspace_data } = require('./send_nyxus_data');
+
+            this.output.appendLine(`Uploading workspace archive (${archiveResult.fileCount} files) with workspace ID ${workspaceId}...`);
+            const result = await send_workspace_data(
+                (event) => this.output.appendLine(`[StageFlow] ${event}`),
+                {
+                    archive: archiveResult.archive,
+                    fileCount: archiveResult.fileCount,
+                    workspaceName: meta.customName || archiveResult.workspaceName,
+                    customName: meta.customName,
+                    description: meta.description,
+                    workspace_id: workspaceId
+                },
+                this.context
+            );
+
+            this.output.appendLine(`Workspace staged and uploaded successfully: ${result.fileCount} files.`);
+            this.sendMessage({
+                type: 'workspace_git_action_result',
+                ok: true,
+                action: 'stage_workspace',
+                message: `Workspace staged and uploaded (${result.fileCount} files).`
+            });
+            vscode.window.showInformationMessage(`Nyxus: Workspace staged and synced (${result.fileCount} files).`);
+        } catch (error) {
+            const detail = error instanceof Error ? error.message : String(error);
+            this.output.appendLine(`Stage workspace failed: ${detail}`);
+            this.sendMessage({
+                type: 'workspace_git_action_result',
+                ok: false,
+                action: 'stage_workspace',
                 error: detail
             });
         }

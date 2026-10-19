@@ -309,14 +309,70 @@ class SidebarProvider {
             }
 
             if (message.type === 'stage_workspace') {
-                const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+                const folder = vscode.workspace.workspaceFolders?.[0];
+                if (!folder) {
+                    this.sendMessage({
+                        type: 'workspace_git_action_result',
+                        ok: false,
+                        action: 'stage_workspace',
+                        error: 'Open a workspace folder first.'
+                    });
+                    return;
+                }
+
+                const workspaceRoot = folder.uri.fsPath;
+                const workspaceId = (folder && this.context ? getStoredWorkspaceId(this.context, folder.uri) : '') || message.workspaceId || '';
+                if (!workspaceId) {
+                    this.sendMessage({
+                        type: 'workspace_git_action_result',
+                        ok: false,
+                        action: 'stage_workspace',
+                        error: 'No Workspace ID assigned. Please request a Workspace ID before staging.'
+                    });
+                    return;
+                }
+
                 try {
-                    if (!workspaceRoot) throw new Error('Open a workspace folder first.');
-                    const { stageWorkspace } = require('./workspace_archive');
-                    await stageWorkspace(workspaceRoot);
-                    this.sendMessage({ type: 'workspace_git_action_result', ok: true, action: 'stage_workspace' });
+                    const { create_workspace_archive } = require('./workspace_archive');
+                    const archiveResult = await create_workspace_archive(workspaceRoot);
+                    const meta = folder && this.context ? getStoredWorkspaceMeta(this.context, folder.uri) : { customName: '', description: '' };
+
+                    const result = await send_workspace_data(
+                        this.logFlow.bind(this),
+                        {
+                            archive: archiveResult.archive,
+                            fileCount: archiveResult.fileCount,
+                            workspaceName: meta.customName || archiveResult.workspaceName,
+                            customName: meta.customName,
+                            description: meta.description,
+                            workspace_id: workspaceId
+                        },
+                        this.context
+                    );
+
+                    this.workspaceDataSent = true;
+                    this.workspaceStatus = {
+                        status: 'ready',
+                        text: `Synced ${result.fileCount} files from ${result.workspaceName}.${archiveResult.commitCreated ? ' A local Git commit was created.' : ' No new Git commit was needed.'}`
+                    };
+                    this.sendMessage({ type: 'workspace_sync_status', ...this.workspaceStatus });
+
+                    this.sendMessage({
+                        type: 'workspace_git_action_result',
+                        ok: true,
+                        action: 'stage_workspace',
+                        message: `Workspace staged and uploaded (${result.fileCount} files).`
+                    });
+                    vscode.window.showInformationMessage(`Nyxus: Workspace staged and synced (${result.fileCount} files).`);
                 } catch (error) {
-                    this.sendMessage({ type: 'workspace_git_action_result', ok: false, action: 'stage_workspace', error: error instanceof Error ? error.message : String(error) });
+                    const detail = error instanceof Error ? error.message : String(error);
+                    this.output.appendLine(`Stage workspace failed: ${detail}`);
+                    this.sendMessage({
+                        type: 'workspace_git_action_result',
+                        ok: false,
+                        action: 'stage_workspace',
+                        error: detail
+                    });
                 }
                 return;
             }

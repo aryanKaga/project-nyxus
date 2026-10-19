@@ -1,0 +1,46 @@
+# Evaluation cases. Fill in 3-5 repos you know well, ~5 questions each.
+# Score each run on: correct files cited, no invented names, tool calls
+# within budget, truncation and unknowns reported. Log every tool call.
+
+repos:
+  - id: repo_a
+    path: /path/to/repo_a          # replace
+    language: typescript           # replace
+  - id: repo_b
+    path: /path/to/repo_b          # replace
+    language: python               # replace
+
+cases:
+  - id: a_overview
+    repo: repo_a
+    question: "What does this codebase do and how is it structured?"
+    expected_skill: codebase-overview
+    must_cite_files: []            # e.g. [src/index.ts, src/server.ts]
+    max_tool_calls: 12
+
+  - id: a_locate_auth
+    repo: repo_a
+    question: "Where is authentication handled?"
+    expected_skill: locate-and-explain
+    must_cite_files: []
+    max_tool_calls: 10
+
+  - id: a_callers
+    repo: repo_a
+    question: "Who calls <SomeKnownFunction>?"
+    expected_skill: locate-and-explain
+    must_cite_files: []
+    max_tool_calls: 8
+
+  - id: a_trace
+    repo: repo_a
+    question: "What happens when a user submits <some action>?"
+    expected_skill: trace-flow
+    must_cite_files: []
+    max_tool_calls: 18
+
+  - id: a_unsupported
+    repo: repo_a
+    question: "What would break if I change <SomeFunction>'s signature?"
+    expected_skill: null           # phase 2 feature
+    expect_behavior: "Says impact analysis is not available yet; does not fake it."

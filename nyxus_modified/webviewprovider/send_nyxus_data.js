@@ -22,7 +22,14 @@ async function send_workspace_data(logFlow, workspaceData, context) {
     const uploadUrl = baseUrl + '/upload';
 
     const userId = await require('./user_id_storage').getUserId(context);
-    const workspaceId = workspaceData?.workspace_id || workspaceData?.workspaceId || '';
+    let workspaceId = workspaceData?.workspace_id || workspaceData?.workspaceId || '';
+    if (!workspaceId) {
+        const folderUri = vscode.workspace.workspaceFolders?.[0]?.uri;
+        if (folderUri && context) {
+            const { getStoredWorkspaceId } = require('./workspace_storage');
+            workspaceId = getStoredWorkspaceId(context, folderUri) || '';
+        }
+    }
 
     logFlow('request.workspace_archive');
 
@@ -37,7 +44,8 @@ async function send_workspace_data(logFlow, workspaceData, context) {
             headers: {
                 'Content-Type': 'application/json',
                 'x-user-id': userId,
-                'x-api-key': apiKey
+                'x-api-key': apiKey,
+                'x-workspace-id': workspaceId
             },
             body: JSON.stringify({
                 user_id: userId,
@@ -45,8 +53,11 @@ async function send_workspace_data(logFlow, workspaceData, context) {
                 api_key: apiKey,
                 apiKey: apiKey,
                 workspace_id: workspaceId,
+                workspaceId: workspaceId,
                 workspace_name: workspaceData.workspaceName || '',
+                workspaceName: workspaceData.workspaceName || '',
                 custom_name: workspaceData.customName || workspaceData.workspaceName || '',
+                customName: workspaceData.customName || workspaceData.workspaceName || '',
                 description: workspaceData.description || '',
                 archive: workspaceData.archive.toString('base64')
             }),
