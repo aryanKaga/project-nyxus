@@ -32,7 +32,7 @@ AGENT_IMAGE = (os.getenv("AGENT_IMAGE") or "nyxus-hybridbackend:latest").strip('
 AGENT_PORT = int(os.getenv("AGENT_PORT") or os.getenv("PORT") or "3000")
 MAX_ACTIVE_PODS = int(os.getenv("MAX_ACTIVE_PODS") or "10")
 KUBE_CONTEXT = (os.getenv("KUBE_CONTEXT") or "").strip('\'" ') or None
-print('kube context is',KUBE_CONTEXT)
+
 AGENT_SECRET_NAME = (os.getenv("AGENT_SECRET_NAME") or "").strip('\'" ') or None
 READY_TIMEOUT = float(os.getenv("READY_TIMEOUT") or "90")
 RESUME_TIMEOUT = float(os.getenv("RESUME_TIMEOUT") or "30")
@@ -440,6 +440,7 @@ async def gateway_workspace_resume(sid, data):
 
 @sio.on("chat")
 async def gateway_chat(sid, data):
+    print('request came on this')
     """Client sends a chat message."""
     if not isinstance(data, dict):
         return {"ok": False, "error": "Invalid chat request."}
