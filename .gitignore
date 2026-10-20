@@ -62,3 +62,9 @@ Nyxus.mp4
 *.sqlite
 *.sqlite3
 *.mp4
+
+# Server unpacked storage and archives
+storage/
+**/storage/
+.upload-*/
+**/.upload-*/

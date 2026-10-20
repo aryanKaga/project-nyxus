@@ -49,7 +49,7 @@ def unpack_workspace_archive(archive_bytes, storage_root, workspace_id=None):
     if final_root.exists():
         shutil.rmtree(temporary_root, ignore_errors=True)
         raise ArchiveError("The workspace already exists in local storage.")
-
+    
     try:
         try:
             archive = zipfile.ZipFile(io.BytesIO(archive_bytes))
@@ -100,7 +100,11 @@ def unpack_workspace_archive(archive_bytes, storage_root, workspace_id=None):
                 file_count += 1
 
         temporary_root.rename(final_root)
-        return {"workspace_id": workspace_id, "file_count": file_count}
+        return {
+            "workspace_id": workspace_id,
+            "file_count": file_count,
+            "file_path": str(final_root),
+        }
     except Exception:
         shutil.rmtree(temporary_root, ignore_errors=True)
         raise
@@ -156,5 +160,4 @@ if __name__ == "__main__":
     except Exception as err:
         print(json.dumps({"ok": False, "error": str(err)}))
         sys.exit(2)
-
 

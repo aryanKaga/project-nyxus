@@ -57,8 +57,21 @@ const handleWorkspaceDelete = async (req, res) => {
     try {
       await db.collection("workspace_ids").deleteMany({ workspace_id });
     } catch (e) {}
+    try{
+        const result = await db.collection("users").updateOne(
+            { user_id: user_id },
+            {
+                $pull: {
+                    workspace_ids: workspace_id
+                }
+            }
+        );
 
-    // 5. Clean up any Redis cached entries
+    }
+    catch(err){
+        console.warn("[Delete] could not reduce users count for the deleted workspace")
+    }
+    // 5. Clean up any Redis cached e   ntries
     try {
       await redis.del(`workspace:${workspace_id}`);
       await redis.del(`workspace_id:${workspace_id}`);

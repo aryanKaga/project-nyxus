@@ -9,13 +9,14 @@ const PYTHON_RECEIVER_PATH = path.join(__dirname, "workspace_receiver.py");
  * Unpacks a workspace archive using the Python workspace_receiver script.
  * @param {Buffer|string} archiveBuffer - ZIP archive as Buffer or base64 string
  * @param {object} [options] - Optional settings (workspace_id, storage_root)
- * @returns {Promise<{ ok: boolean, workspace_id: string, file_count: number }>}
+ * @returns {Promise<{ ok: boolean, workspace_id: string, file_count: number, file_path: string }>}
  */
 export function unpackWorkspaceWithPython(archiveBuffer, options = {}) {
     return new Promise((resolve, reject) => {
         const python = spawn("python3", [PYTHON_RECEIVER_PATH], {
             cwd: __dirname,
         });
+        
 
         let stdout = "";
         let stderr = "";

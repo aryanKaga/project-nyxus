@@ -466,3 +466,54 @@ def test_cleanup_deletes_only_idle_workspaces_and_preserves_active_ones(
     assert (tmp_path / locked_id).is_dir()
     assert not stale_marker.exists()
     assert "stale-sid" not in server.workspace_sessions
+
+
+def test_container_health_and_readiness_endpoints(monkeypatch):
+    from starlette.testclient import TestClient
+
+    monkeypatch.setattr(server, "CONTAINER_WORKSPACE_ID", "test-container-ws")
+    monkeypatch.setattr(server, "_container_ready", True)
+
+    client = TestClient(server.app)
+    health_resp = client.get("/health")
+    assert health_resp.status_code == 200
+    assert health_resp.json()["workspace_id"] == "test-container-ws"
+
+    live_resp = client.get("/live")
+    assert live_resp.status_code == 200
+
+    ready_resp = client.get("/ready")
+    assert ready_resp.status_code == 200
+    assert ready_resp.json()["ready"] is True
+
+
+def test_container_chat_auto_resolves_container_workspace(monkeypatch):
+    monkeypatch.setattr(server, "CONTAINER_WORKSPACE_ID", "container-ws-123")
+    monkeypatch.setattr(server, "CONTAINER_USER_ID", "container-user-456")
+    scheduled = []
+    monkeypatch.setattr(
+        server.socketio,
+        "start_background_task",
+        lambda *args: scheduled.append(args),
+    )
+    fake_session = server.WorkspaceSession(
+        workspace_id="container-ws-123",
+        thread_id="container-ws-123:container-user-456",
+        graph=SimpleNamespace(agent_config={}),
+    )
+    monkeypatch.setattr(server, "_container_session", fake_session)
+    monkeypatch.setattr(server, "_get_workspace_session", lambda *args, **kwargs: fake_session)
+    monkeypatch.setattr(server, "_session_matches", lambda *args, **kwargs: True)
+
+    client = server.socketio.test_client(server.app)
+    # Chat sent without workspace_id should automatically use CONTAINER_WORKSPACE_ID
+    response = client.emit(
+        "chat",
+        {"apikey": "container-user-456", "prompt": "Hello container agent"},
+        callback=True,
+    )
+
+    assert response == {"ok": True}
+    assert len(scheduled) == 1
+    assert scheduled[0][4] == "container-ws-123"
+    client.disconnect()

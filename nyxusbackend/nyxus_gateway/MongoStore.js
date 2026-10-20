@@ -114,6 +114,8 @@ export class MongoStore {
       }
       throw err;
     }
+
+    
     return document;
   }
 

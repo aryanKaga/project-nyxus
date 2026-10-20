@@ -1,13 +1,19 @@
 import express from "express";
+import { rm } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { unpackWorkspaceWithPython } from "./ingestion/ingest.js";
 
 import getMongoStore from "../MongoStore.js";
 
-
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const STORAGE_ROOT = path.resolve(
+    process.env.STORAGE_DIR || path.resolve(__dirname, "..", "storage")
+);
 
 
 const upload = express.Router();
-const mongostore = getMongoStore()
+const mongostore = getMongoStore();
 
 
 
@@ -63,15 +69,27 @@ const handleWorkspaceUpload = async (req, res) => {
         const result = await unpackWorkspaceWithPython(archive, {
             workspace_id,
         });
-        await mongostore.saveWorkspace(api_key, workspace_id, archive, result.file_count) 
+        
+        await mongostore.saveWorkspace(api_key, workspace_id, archive, result.file_count);
 
         console.log(`[Upload] Ingestion successful. Workspace ID: ${result.workspace_id}, Files: ${result.file_count}`);
 
+        const workspacePath = path.resolve(result.file_path);
+        const expectedWorkspacePath = path.resolve(STORAGE_ROOT, workspace_id);
+        if (
+            typeof result.file_path !== "string" ||
+            path.dirname(expectedWorkspacePath) !== STORAGE_ROOT ||
+            workspacePath !== expectedWorkspacePath
+        ) {
+            throw new Error("Workspace extraction path is invalid; refusing to delete it.");
+        }
+        await rm(workspacePath, { recursive: true, force: true });
+        
         return res.status(200).json({
             ok: true,
             workspace_id: result.workspace_id,
             file_count: result.file_count,
-            message: "Workspace unpacked and ingested successfully",
+            message: "Workspace archived successfully; temporary extracted files were removed.",
         });
     } catch (error) {
         console.error("[Upload] Ingestion pipeline failed:", error);

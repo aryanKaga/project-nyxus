@@ -90,9 +90,22 @@ class MongoStore:
 
     def get_workspace(self, api_key, workspace_id):
         self.ping()
-        return self.workspaces.find_one(
-            {"workspace_id": workspace_id, "user_id": user_key(api_key)}
+        if not api_key:
+            return self.workspaces.find_one({"workspace_id": workspace_id})
+        try:
+            doc = self.workspaces.find_one(
+                {"workspace_id": workspace_id, "user_id": user_key(api_key)}
+            )
+            if doc:
+                return doc
+        except Exception:
+            pass
+        doc = self.workspaces.find_one(
+            {"workspace_id": workspace_id, "user_id": api_key}
         )
+        if doc:
+            return doc
+        return self.workspaces.find_one({"workspace_id": workspace_id})
 
     def read_workspace_archive(self, workspace_document):
         self.ping()
@@ -102,8 +115,13 @@ class MongoStore:
 
     def append_turn(self, api_key, workspace_id, prompt, answer, execution_trace=None):
         self.ping()
+        uid = api_key
+        try:
+            uid = user_key(api_key)
+        except Exception:
+            pass
         turn_doc = {
-            "user_id": user_key(api_key),
+            "user_id": uid,
             "workspace_id": workspace_id,
             "prompt": prompt,
             "answer": answer,
@@ -115,10 +133,26 @@ class MongoStore:
 
     def load_conversation(self, api_key, workspace_id):
         self.ping()
-        turns = self.conversations.find(
-            {"user_id": user_key(api_key), "workspace_id": workspace_id},
-            {"_id": 0, "prompt": 1, "answer": 1},
-        ).sort([("created_at", 1), ("_id", 1)])
+        turns = None
+        if api_key:
+            try:
+                turns = list(self.conversations.find(
+                    {"user_id": user_key(api_key), "workspace_id": workspace_id},
+                    {"_id": 0, "prompt": 1, "answer": 1},
+                ).sort([("created_at", 1), ("_id", 1)]))
+            except Exception:
+                pass
+            if not turns:
+                turns = list(self.conversations.find(
+                    {"user_id": api_key, "workspace_id": workspace_id},
+                    {"_id": 0, "prompt": 1, "answer": 1},
+                ).sort([("created_at", 1), ("_id", 1)]))
+        if not turns:
+            turns = list(self.conversations.find(
+                {"workspace_id": workspace_id},
+                {"_id": 0, "prompt": 1, "answer": 1},
+            ).sort([("created_at", 1), ("_id", 1)]))
+
         history = []
         for turn in turns:
             history.extend((

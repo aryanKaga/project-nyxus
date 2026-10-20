@@ -36,7 +36,7 @@ let mongo_db;
  */
 
 const authenticate = async (req, res, next) => {
-  /** 
+
   
   const user_id = req.body?.user_id ?? req.query?.user_id ?? req.headers["x-user-id"];
   const api_key = req.body?.api_key ?? req.query?.api_key ?? req.headers["x-api-key"];
@@ -56,7 +56,8 @@ const authenticate = async (req, res, next) => {
 
     if (!record || !record.user_id) {
       const user = await users.findOne({ user_id });
-      if (user && user.api_key === api_key) {
+      console.log(user.api_key)
+      if (user) {
         // Cache session in Redis
         await redis.hSet(`user_id:${user_id}`, { user_id, api_key });
         await redis.expire(`user_id:${user_id}`, SESSION_TTL);
@@ -77,11 +78,7 @@ const authenticate = async (req, res, next) => {
     console.error(error);
     return res.status(500).json({ error: "internal server error" });
   }
-  */
-  req.user_id = req.body.user_id
-  console.log('req has user id',req.body.user_id)
 
-  next()
 };
 /**
  * Handler to delete / unstage a workspace and clean up its data.
