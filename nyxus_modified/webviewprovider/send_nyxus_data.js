@@ -85,6 +85,9 @@ async function send_workspace_data(logFlow, workspaceData, context) {
         const detail = typeof data?.error === 'string'
             ? data.error
             : `HTTP ${response.status}: ${rawBody.slice(0, 200)}`;
+        if (/workspace\s+id\s+already\s+exists/i.test(detail)) {
+            throw new Error('This folder’s Workspace ID is already in use on the Nyxus server. In Settings, clear this folder’s Workspace ID, request a new ID, then retry the Git transfer.');
+        }
         throw new Error(`The Nyxus server did not confirm the workspace archive. ${detail}`);
     }
 

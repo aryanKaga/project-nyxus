@@ -551,7 +551,9 @@ class SidebarProvider {
                 this.logFlow('request.chat.blocked.workspace_not_ready');
                 this.sendMessage({
                     type: 'assistant_error',
-                    error: 'Workspace sync is not ready yet. Wait for the Git transfer to finish and try again.'
+                    error: this.workspaceStatus.status === 'error'
+                        ? this.workspaceStatus.text
+                        : 'Workspace sync is still in progress. Wait for the Git transfer to finish and try again.'
                 });
                 return;
             }
