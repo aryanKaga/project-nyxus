@@ -3,7 +3,18 @@ from types import SimpleNamespace
 
 import agent_loop
 import observability
+import pytest
 import server
+
+
+@pytest.fixture(autouse=True)
+def reset_server_state():
+    server.current_session = None
+    server.CONTAINER_WORKSPACE_ID = None
+    server.CONTAINER_USER_ID = "container-user"
+    yield
+    server.current_session = None
+    server.CONTAINER_WORKSPACE_ID = None
 
 
 class FakeStopEvent:
@@ -71,10 +82,7 @@ def test_chat_requires_uploaded_workspace_and_schedules_agent(monkeypatch):
     assert server.user_to_workspaceid[sid] == "workspace-test"
     assert prompt == "Where is startup handled?"
     assert api_key == server.EXPECTED_API_KEY
-    assert scheduled[0][4] == "workspace-test"
     assert readme_mode is False
-    assert server._workspace_task_counts["workspace-test"] == 1
-    server._end_workspace_task("workspace-test")
     assert scheduled[0][0] == server._run_agent_chat
     assert [item["name"] for item in client.get_received()] == ["assistant_start"]
     client.disconnect()
@@ -375,11 +383,10 @@ def test_workspace_resume_returns_saved_id_and_conversation(monkeypatch, tmp_pat
         callback=True,
     )
 
-    assert response == {
-        "ok": True,
-        "workspace_id": "workspace-saved",
-        "history": [{"role": "user", "content": "Earlier question"}],
-    }
+    assert response["ok"] is True
+    assert response["workspace_id"] == "workspace-saved"
+    assert response["history"] == [{"role": "user", "content": "Earlier question"}]
+    assert "session_id" in response
     client.disconnect()
 
 
@@ -406,66 +413,43 @@ def test_workspace_resume_rejects_an_unknown_workspace_id(monkeypatch):
     client.disconnect()
 
 
-def test_cleanup_deletes_only_idle_workspaces_and_preserves_active_ones(
-    monkeypatch,
-    tmp_path,
-):
-    monkeypatch.setattr(server, "STORAGE_DIR", tmp_path)
-    monkeypatch.setattr(server, "workspace_last_access", {})
-    monkeypatch.setattr(server, "_workspace_task_counts", {})
-    stale_id = "00000000-0000-4000-8000-000000000001"
-    recent_id = "00000000-0000-4000-8000-000000000002"
-    active_id = "00000000-0000-4000-8000-000000000003"
-    locked_id = "00000000-0000-4000-8000-000000000004"
-    activity_dir = tmp_path / ".workspace-activity"
-
-    for workspace_id in (stale_id, recent_id, active_id, locked_id):
-        (tmp_path / workspace_id).mkdir()
-        (tmp_path / workspace_id / "source.py").write_text("content")
-
-    activity_dir.mkdir()
-    old_time = 1_000 - server.WORKSPACE_IDLE_TIMEOUT_SECONDS - 1
-    stale_marker = activity_dir / stale_id
-    stale_marker.touch()
-    os.utime(stale_marker, (old_time, old_time))
-    recent_marker = activity_dir / recent_id
-    recent_marker.touch()
-    os.utime(recent_marker, (999, 999))
-    server.workspace_last_access[active_id] = old_time
-    server._workspace_task_counts[active_id] = 1
-    locked_session = server.WorkspaceSession(
-        workspace_id=locked_id,
-        thread_id="locked-session",
-        graph=None,
-    )
-    locked_session.lock.acquire()
-    stale_session = server.WorkspaceSession(
-        workspace_id=stale_id,
-        thread_id="stale-session",
-        graph=None,
-    )
+def test_single_dedicated_session_preserves_instance_across_requests(monkeypatch, tmp_path):
+    store = FakeStore()
+    monkeypatch.setattr(server, "get_mongo_store", lambda: store)
     monkeypatch.setattr(
         server,
-        "workspace_sessions",
-        {
-            "locked-sid": locked_session,
-            "stale-sid": stale_session,
+        "load_workspace",
+        lambda workspace_id, api_key, storage, repository: {
+            "workspace_id": workspace_id,
+            "workspace_path": tmp_path,
+            "file_count": 1,
         },
     )
+    monkeypatch.setattr(
+        agent_loop,
+        "build_graph",
+        lambda **kwargs: SimpleNamespace(agent_config={}),
+    )
+    client = server.socketio.test_client(server.app)
 
-    try:
-        removed = server._cleanup_expired_workspaces(now=1_000)
-    finally:
-        locked_session.lock.release()
+    res1 = client.emit(
+        "workspace_resume",
+        {"apiKey": server.EXPECTED_API_KEY, "workspace_id": "ws-dedicated"},
+        callback=True,
+    )
+    assert res1["ok"] is True
+    session_id_1 = res1.get("session_id")
+    assert session_id_1 is not None
 
-    assert removed == [stale_id]
-    assert not (tmp_path / stale_id).exists()
-    assert (tmp_path / recent_id).is_dir()
-    assert (tmp_path / active_id).is_dir()
-    assert (tmp_path / active_id / "source.py").read_text() == "content"
-    assert (tmp_path / locked_id).is_dir()
-    assert not stale_marker.exists()
-    assert "stale-sid" not in server.workspace_sessions
+    res2 = client.emit(
+        "workspace_resume",
+        {"apiKey": server.EXPECTED_API_KEY, "workspace_id": "ws-dedicated"},
+        callback=True,
+    )
+    assert res2["ok"] is True
+    assert res2.get("session_id") == session_id_1
+    assert server.current_session.session_id == session_id_1
+    client.disconnect()
 
 
 def test_container_health_and_readiness_endpoints(monkeypatch):
@@ -501,9 +485,8 @@ def test_container_chat_auto_resolves_container_workspace(monkeypatch):
         thread_id="container-ws-123:container-user-456",
         graph=SimpleNamespace(agent_config={}),
     )
-    monkeypatch.setattr(server, "_container_session", fake_session)
+    monkeypatch.setattr(server, "current_session", fake_session)
     monkeypatch.setattr(server, "_get_workspace_session", lambda *args, **kwargs: fake_session)
-    monkeypatch.setattr(server, "_session_matches", lambda *args, **kwargs: True)
 
     client = server.socketio.test_client(server.app)
     # Chat sent without workspace_id should automatically use CONTAINER_WORKSPACE_ID

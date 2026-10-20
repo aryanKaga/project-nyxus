@@ -9,9 +9,10 @@ import sys
 import threading
 import time
 import uuid
+from typing import Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Response, status
+from fastapi import FastAPI, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 import socketio as python_socketio
 import uvicorn
@@ -30,16 +31,16 @@ load_dotenv(BASE_DIR / "atlas-credentials.env")
 AGENT_DIR = BASE_DIR / "src" / "agent"
 STORAGE_DIR = Path(os.environ.get("WORKSPACE_STORAGE", BASE_DIR / "workspaces")).resolve()
 
-# Container and user settings
+# Dedicated runtime session identifier generated for this container execution
+RUNTIME_SESSION_ID = f"sess-{uuid.uuid4().hex[:12]}"
+
+# Container environment configuration
 CONTAINER_WORKSPACE_ID = os.environ.get("WORKSPACE_ID") or os.environ.get("NYXUS_WORKSPACE_ID")
 CONTAINER_USER_ID = os.environ.get("USER_ID") or os.environ.get("NYXUS_USER_ID") or os.environ.get("NYXUS_API_KEY", "abc123")
 EXPECTED_API_KEY = os.environ.get("NYXUS_API_KEY", "abc123")
 HOST = os.environ.get("NYXUS_HOST", os.environ.get("HOST", "0.0.0.0"))
 PORT = int(os.environ.get("PORT", os.environ.get("NYXUS_PORT", "3000")))
 CHAT_TIMEOUT_SECONDS = int(os.environ.get("NYXUS_CHAT_TIMEOUT_SECONDS", "900"))
-WORKSPACE_IDLE_TIMEOUT_SECONDS = 10 * 60
-WORKSPACE_CLEANUP_INTERVAL_SECONDS = 30
-ENABLE_WORKSPACE_CLEANUP = os.environ.get("ENABLE_WORKSPACE_CLEANUP", "false").lower() in ("true", "1", "yes")
 
 if str(AGENT_DIR) not in sys.path:
     sys.path.insert(0, str(AGENT_DIR))
@@ -50,9 +51,62 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("hybridbackend")
 
 _main_loop = None
-_container_session = None
 _container_ready = False
 _container_init_error = None
+
+
+@dataclass
+class DedicatedSession:
+    """Dedicated single-user workspace session for this container runtime."""
+    workspace_id: str
+    thread_id: str
+    graph: object
+    session_id: str = field(default_factory=lambda: RUNTIME_SESSION_ID)
+    history: list = field(default_factory=list)
+    history_pending: bool = True
+    lock: threading.Lock = field(default_factory=threading.Lock)
+
+
+# Backwards compatibility alias
+WorkspaceSession = DedicatedSession
+
+# Single active dedicated session for this container
+current_session: Optional[DedicatedSession] = None
+_session_lock = threading.Lock()
+
+
+# Compatibility dict-like mapping for legacy callers / tests
+class _SessionWorkspaceMapping(dict):
+    def __getitem__(self, key):
+        return current_session.workspace_id if current_session else None
+
+    def get(self, key, default=None):
+        return current_session.workspace_id if current_session else default
+
+    def __contains__(self, key):
+        return current_session is not None
+
+
+user_to_workspaceid = _SessionWorkspaceMapping()
+workspace_sessions = {}
+
+
+def _session_matches(sid=None, workspace_id=None, api_key=None):
+    return current_session is not None and (
+        not workspace_id or current_session.workspace_id == workspace_id
+    )
+
+
+def _touch_workspace(workspace_id=None):
+    pass
+
+
+def _begin_workspace_task(workspace_id=None):
+    pass
+
+
+def _end_workspace_task(workspace_id=None):
+    pass
 
 
 class SocketIOTestClient:
@@ -147,209 +201,73 @@ socketio = AsyncSocketIOServer(
 sio = socketio
 
 
-@dataclass
-class WorkspaceSession:
-    workspace_id: str
-    thread_id: str
-    graph: object
-    history: list = field(default_factory=list)
-    history_pending: bool = True
-    lock: threading.Lock = field(default_factory=threading.Lock)
+def init_dedicated_session(workspace_id: str, api_key: str = None) -> DedicatedSession:
+    """Download workspace from MongoDB if needed and compile the agent graph for this container."""
+    global current_session
+    with _session_lock:
+        if current_session is not None and current_session.workspace_id == workspace_id:
+            return current_session
 
+        api_key = api_key or CONTAINER_USER_ID
+        store = None
+        try:
+            store = get_mongo_store()
+        except Exception as exc:
+            logger.warning("MongoDB store unavailable during workspace init: %s", exc)
 
-user_to_workspaceid = {}
-workspace_sessions = {}
-_workspace_sessions_lock = threading.Lock()
-workspace_last_access = {}
-_workspace_task_counts = {}
+        result = load_workspace(
+            workspace_id,
+            api_key,
+            STORAGE_DIR,
+            store,
+        ) if store is not None else None
 
+        if result is None:
+            raise LookupError(f"Workspace {workspace_id} not found in MongoDB for this user.")
 
-def _touch_workspace(workspace_id):
-    if not isinstance(workspace_id, str):
-        return
-    try:
-        if str(uuid.UUID(workspace_id)) != workspace_id:
-            return
-    except (TypeError, ValueError, AttributeError):
-        return
+        from agent_loop import build_graph
 
-    now = time.time()
-    marker = STORAGE_DIR / ".workspace-activity" / workspace_id
-    try:
-        marker.parent.mkdir(parents=True, exist_ok=True)
-        marker.touch(exist_ok=True)
-        os.utime(marker, (now, now))
-    except OSError:
-        logger.exception("Could not update activity marker for workspace %s", workspace_id)
-    with _workspace_sessions_lock:
-        workspace_last_access[workspace_id] = now
-
-
-def _begin_workspace_task(workspace_id):
-    _touch_workspace(workspace_id)
-    with _workspace_sessions_lock:
-        _workspace_task_counts[workspace_id] = (
-            _workspace_task_counts.get(workspace_id, 0) + 1
+        graph = build_graph(root=result["workspace_path"], agent_dir=AGENT_DIR)
+        history = store.load_conversation(api_key, workspace_id) if store else []
+        session = DedicatedSession(
+            session_id=RUNTIME_SESSION_ID,
+            workspace_id=workspace_id,
+            thread_id=f"{workspace_id}:{user_key(api_key)}",
+            graph=graph,
+            history=history,
         )
+        current_session = session
+        workspace_sessions[RUNTIME_SESSION_ID] = session
+        return session
 
 
-def _end_workspace_task(workspace_id):
-    _touch_workspace(workspace_id)
-    with _workspace_sessions_lock:
-        count = _workspace_task_counts.get(workspace_id, 0)
-        if count <= 1:
-            _workspace_task_counts.pop(workspace_id, None)
-        else:
-            _workspace_task_counts[workspace_id] = count - 1
+# Compatibility helpers
+def _get_workspace_session(sid=None, api_key=None):
+    global current_session
+    if current_session is not None:
+        return current_session
+    ws_id = CONTAINER_WORKSPACE_ID
+    if not ws_id:
+        raise LookupError("Upload or select a workspace before chatting.")
+    return init_dedicated_session(ws_id, api_key)
 
 
-def _workspace_activity_time(workspace_id, root):
-    with _workspace_sessions_lock:
-        last_access = workspace_last_access.get(workspace_id)
-    if last_access is not None:
-        return last_access
-
-    marker = STORAGE_DIR / ".workspace-activity" / workspace_id
-    try:
-        return marker.stat().st_mtime
-    except FileNotFoundError:
-        try:
-            return root.stat().st_mtime
-        except OSError:
-            return 0
-    except OSError:
-        logger.exception("Could not read activity marker for workspace %s", workspace_id)
-        return 0
-
-
-def _cleanup_expired_workspaces(now=None):
-    now = time.time() if now is None else now
-    STORAGE_DIR.mkdir(parents=True, exist_ok=True)
-    expired = []
-    with os.scandir(STORAGE_DIR) as entries:
-        storage_entries = list(entries)
-
-    for entry in storage_entries:
-        if entry.name.startswith(".expired-") and entry.is_dir(follow_symlinks=False):
-            try:
-                shutil.rmtree(entry.path)
-                logger.info("Removed interrupted workspace cleanup directory %s", entry.name)
-            except OSError:
-                logger.exception("Could not remove interrupted cleanup directory %s", entry.name)
-
-    workspace_entries = [
-        entry for entry in storage_entries
-        if entry.is_dir(follow_symlinks=False)
-    ]
-
-    for entry in workspace_entries:
-        workspace_id = entry.name
-        try:
-            if str(uuid.UUID(workspace_id)) != workspace_id:
-                continue
-            root = Path(entry.path)
-            if now - _workspace_activity_time(workspace_id, root) < WORKSPACE_IDLE_TIMEOUT_SECONDS:
-                continue
-        except (TypeError, ValueError, OSError):
-            continue
-
-        with _workspace_sessions_lock:
-            last_access = workspace_last_access.get(workspace_id, 0)
-            marker = STORAGE_DIR / ".workspace-activity" / workspace_id
-            try:
-                last_access = max(last_access, marker.stat().st_mtime)
-            except FileNotFoundError:
-                try:
-                    last_access = max(last_access, root.stat().st_mtime)
-                except OSError:
-                    pass
-            except OSError:
-                logger.exception(
-                    "Could not recheck activity marker for workspace %s",
-                    workspace_id,
-                )
-                continue
-            if now - last_access < WORKSPACE_IDLE_TIMEOUT_SECONDS:
-                continue
-            if _workspace_task_counts.get(workspace_id, 0):
-                continue
-            if any(
-                session.workspace_id == workspace_id and session.lock.locked()
-                for session in workspace_sessions.values()
-            ):
-                continue
-            expired_path = STORAGE_DIR / f".expired-{workspace_id}-{uuid.uuid4().hex}"
-            try:
-                root.rename(expired_path)
-            except FileNotFoundError:
-                continue
-            except OSError:
-                logger.exception("Could not expire idle workspace %s", workspace_id)
-                continue
-            for sid_key, session in list(workspace_sessions.items()):
-                if session.workspace_id == workspace_id:
-                    workspace_sessions.pop(sid_key, None)
-            workspace_last_access.pop(workspace_id, None)
-            marker = STORAGE_DIR / ".workspace-activity" / workspace_id
-            try:
-                marker.unlink(missing_ok=True)
-            except OSError:
-                logger.exception(
-                    "Could not remove activity marker for workspace %s",
-                    workspace_id,
-                )
-            expired.append((workspace_id, expired_path))
-
-    deleted = []
-    for workspace_id, expired_path in expired:
-        try:
-            shutil.rmtree(expired_path)
-            deleted.append(workspace_id)
-            logger.info(
-                "Deleted workspace %s after %s seconds without activity",
-                workspace_id,
-                WORKSPACE_IDLE_TIMEOUT_SECONDS,
-            )
-        except OSError:
-            logger.exception("Could not finish deleting expired workspace %s", workspace_id)
-            try:
-                with _workspace_sessions_lock:
-                    original_path = STORAGE_DIR / workspace_id
-                    if not original_path.exists():
-                        expired_path.rename(original_path)
-            except OSError:
-                logger.exception("Could not restore expired workspace %s", workspace_id)
-
-    return deleted
-
-
-def _workspace_cleanup_loop():
-    while True:
-        time.sleep(WORKSPACE_CLEANUP_INTERVAL_SECONDS)
-        try:
-            _cleanup_expired_workspaces()
-        except Exception:
-            logger.exception("Workspace cleanup failed")
+def _activate_workspace(sid, workspace_id, api_key):
+    return init_dedicated_session(workspace_id, api_key)
 
 
 async def _init_container_workspace():
-    """Download and unpack workspace from MongoDB for this dedicated container."""
-    global _container_session, _container_ready, _container_init_error
+    """Startup task: download and initialize workspace for the dedicated container."""
+    global _container_ready, _container_init_error
     try:
         logger.info(
-            "Container startup: downloading and initializing workspace %s (user: %s)...",
+            "Container startup: downloading workspace %s from MongoDB (dedicated session: %s)...",
             CONTAINER_WORKSPACE_ID,
-            CONTAINER_USER_ID,
+            RUNTIME_SESSION_ID,
         )
-        session = await asyncio.to_thread(
-            _activate_workspace,
-            "container-main",
-            CONTAINER_WORKSPACE_ID,
-            CONTAINER_USER_ID,
-        )
-        _container_session = session
+        await asyncio.to_thread(init_dedicated_session, CONTAINER_WORKSPACE_ID, CONTAINER_USER_ID)
         _container_ready = True
-        logger.info("Container workspace %s successfully initialized and ready.", CONTAINER_WORKSPACE_ID)
+        logger.info("Dedicated session %s ready for workspace %s.", RUNTIME_SESSION_ID, CONTAINER_WORKSPACE_ID)
     except Exception as exc:
         _container_init_error = str(exc)
         logger.exception("Failed to initialize workspace for container")
@@ -359,14 +277,12 @@ async def _init_container_workspace():
 async def lifespan(app: FastAPI):
     global _main_loop
     _main_loop = asyncio.get_running_loop()
-    if ENABLE_WORKSPACE_CLEANUP:
-        socketio.start_background_task(_workspace_cleanup_loop)
     if CONTAINER_WORKSPACE_ID:
         asyncio.create_task(_init_container_workspace())
     yield
 
 
-app = FastAPI(title="Nyxus Agent Container Backend", lifespan=lifespan)
+app = FastAPI(title="Nyxus Dedicated Agent Container", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -382,8 +298,9 @@ async def health_check():
     """Kubernetes liveness probe endpoint."""
     return {
         "status": "ok",
-        "mode": "container",
-        "workspace_id": CONTAINER_WORKSPACE_ID,
+        "mode": "dedicated_container",
+        "session_id": RUNTIME_SESSION_ID,
+        "workspace_id": CONTAINER_WORKSPACE_ID or (current_session.workspace_id if current_session else None),
     }
 
 
@@ -395,18 +312,21 @@ async def readiness_check(response: Response):
             response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             return {
                 "status": "error",
+                "session_id": RUNTIME_SESSION_ID,
                 "workspace_id": CONTAINER_WORKSPACE_ID,
                 "error": _container_init_error,
             }
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         return {
             "status": "initializing",
+            "session_id": RUNTIME_SESSION_ID,
             "workspace_id": CONTAINER_WORKSPACE_ID,
             "message": "Downloading workspace from MongoDB...",
         }
     return {
         "status": "ready",
-        "workspace_id": CONTAINER_WORKSPACE_ID or "dynamic",
+        "session_id": RUNTIME_SESSION_ID,
+        "workspace_id": CONTAINER_WORKSPACE_ID or (current_session.workspace_id if current_session else "dynamic"),
         "ready": True,
     }
 
@@ -417,93 +337,15 @@ asgi_app = python_socketio.ASGIApp(socketio, other_asgi_app=app)
 def _authorized(data):
     if not isinstance(data, dict):
         return False
-    # If API key matches
     key = data.get("apiKey") or data.get("apikey")
     if key and (key == EXPECTED_API_KEY or key == CONTAINER_USER_ID):
         return True
-    # If user_id matches container dedicated user
     uid = data.get("user_id") or data.get("userId")
     if uid and uid == CONTAINER_USER_ID:
         return True
-    # If in container mode and EXPECTED_API_KEY is permissive
     if EXPECTED_API_KEY in ("*", ""):
         return True
     return key == EXPECTED_API_KEY
-
-
-def _workspace_root(workspace_id):
-    root = (STORAGE_DIR / workspace_id).resolve()
-    try:
-        root.relative_to(STORAGE_DIR)
-    except ValueError as error:
-        raise ValueError("Workspace path is outside the configured storage.") from error
-    if not root.is_dir():
-        raise FileNotFoundError("The uploaded workspace is no longer available.")
-    return root
-
-
-def _activate_workspace(sid, workspace_id, api_key):
-    _touch_workspace(workspace_id)
-    try:
-        store = get_mongo_store()
-    except Exception as exc:
-        logger.warning("MongoDB store unavailable during workspace activation: %s", exc)
-        store = None
-
-    result = load_workspace(
-        workspace_id,
-        api_key,
-        STORAGE_DIR,
-        store,
-    ) if store is not None else None
-    if result is None:
-        raise LookupError("Workspace id was not found for this Nyxus user.")
-
-    from agent_loop import build_graph
-
-    with _workspace_sessions_lock:
-        workspace_sessions.pop(sid, None)
-        user_to_workspaceid[sid] = workspace_id
-        graph = build_graph(root=result["workspace_path"], agent_dir=AGENT_DIR)
-        session = WorkspaceSession(
-            workspace_id=workspace_id,
-            thread_id=f"{workspace_id}:{user_key(api_key)}",
-            graph=graph,
-            history=store.load_conversation(api_key, workspace_id) if store else [],
-        )
-        workspace_sessions[sid] = session
-        return session
-
-
-def _get_workspace_session(sid, api_key):
-    with _workspace_sessions_lock:
-        session = workspace_sessions.get(sid)
-        workspace_id = user_to_workspaceid.get(sid) or CONTAINER_WORKSPACE_ID
-    if session is not None:
-        _touch_workspace(session.workspace_id)
-        return session
-    if _container_session is not None and (_container_session.workspace_id == workspace_id or not workspace_id):
-        _touch_workspace(_container_session.workspace_id)
-        with _workspace_sessions_lock:
-            workspace_sessions[sid] = _container_session
-            user_to_workspaceid[sid] = _container_session.workspace_id
-        return _container_session
-    if not workspace_id:
-        raise LookupError("Upload or select a workspace before chatting.")
-    return _activate_workspace(sid, workspace_id, api_key)
-
-
-def _session_matches(sid, workspace_id, api_key):
-    with _workspace_sessions_lock:
-        session = workspace_sessions.get(sid)
-        if session is not None:
-            return session.workspace_id == workspace_id and (
-                session.thread_id == f"{workspace_id}:{user_key(api_key)}"
-                or CONTAINER_WORKSPACE_ID == workspace_id
-            )
-        if _container_session is not None and _container_session.workspace_id == workspace_id:
-            return True
-        return False
 
 
 def _chat_progress(sid, stop_event):
@@ -522,17 +364,20 @@ def _run_agent_chat(
     workspace_id=None,
     readme_mode=False,
 ):
+    global current_session
     from agent_loop import final_answer, run_task
     from observability import setup_observability
 
     progress_stop = threading.Event()
-    workspace_id = workspace_id or user_to_workspaceid.get(sid) or CONTAINER_WORKSPACE_ID
+    session = _get_workspace_session(sid, api_key)
+    if session is None:
+        socketio.emit("assistant_error", {"error": "Workspace is not loaded."}, to=sid)
+        return
+    current_session = session
+
     chat_started_at = time.monotonic()
     try:
         socketio.start_background_task(_chat_progress, sid, progress_stop)
-        session = _get_workspace_session(sid, api_key)
-        workspace_id = session.workspace_id
-        _touch_workspace(workspace_id)
         with session.lock:
             def on_trace_event(action, entry):
                 try:
@@ -606,13 +451,17 @@ def _run_agent_chat(
             else:
                 socketio.emit("assistant_chunk", {"token": answer}, to=sid)
             session.history_pending = False
-            get_mongo_store().append_turn(
-                api_key,
-                session.workspace_id,
-                prompt,
-                answer,
-                execution_trace=trace,
-            )
+            try:
+                get_mongo_store().append_turn(
+                    api_key,
+                    session.workspace_id,
+                    prompt,
+                    answer,
+                    execution_trace=trace,
+                )
+            except Exception:
+                logger.warning("Could not persist conversation turn to MongoDB")
+
             session.history.extend((
                 {"role": "user", "content": prompt},
                 {"role": "assistant", "content": answer},
@@ -628,8 +477,8 @@ def _run_agent_chat(
         socketio.emit("assistant_end", {}, to=sid)
     except AgentTimeoutError:
         logger.warning(
-            "Chat request for workspace %s exceeded its %ss deadline",
-            user_to_workspaceid.get(sid, CONTAINER_WORKSPACE_ID or "unknown"),
+            "Chat request for dedicated session %s exceeded its %ss deadline",
+            RUNTIME_SESSION_ID,
             CHAT_TIMEOUT_SECONDS,
         )
         socketio.emit(
@@ -651,18 +500,11 @@ def _run_agent_chat(
         )
     finally:
         progress_stop.set()
-        if workspace_id:
-            _end_workspace_task(workspace_id)
 
 
 @socketio.on("connect")
 async def connect_client(sid, environ, auth=None):
-    logger.info("Client connected: %s", sid)
-    if CONTAINER_WORKSPACE_ID:
-        with _workspace_sessions_lock:
-            user_to_workspaceid[sid] = CONTAINER_WORKSPACE_ID
-            if _container_session is not None:
-                workspace_sessions[sid] = _container_session
+    logger.info("Client connected: %s (dedicated session: %s)", sid, RUNTIME_SESSION_ID)
     return True
 
 
@@ -683,6 +525,19 @@ def receive_workspace_archive(sid, data):
             data["archive"],
             result["file_count"],
         )
+        workspace_path = STORAGE_DIR / result["workspace_id"]
+        try:
+            from agent_loop import build_graph
+            graph = build_graph(root=workspace_path, agent_dir=AGENT_DIR)
+        except Exception:
+            graph = None
+        global current_session
+        current_session = DedicatedSession(
+            workspace_id=result["workspace_id"],
+            thread_id=f"{result['workspace_id']}:{user_key(api_key)}",
+            graph=graph,
+            history=[],
+        )
     except ArchiveError as error:
         return {"ok": False, "error": str(error)}
     except Exception:
@@ -694,32 +549,26 @@ def receive_workspace_archive(sid, data):
             "error": "The server could not persist the workspace. Check MongoDB configuration and try again.",
         }
 
-    _touch_workspace(result["workspace_id"])
-    with _workspace_sessions_lock:
-        previous = workspace_sessions.pop(sid, None)
-        if previous is not None:
-            user_to_workspaceid.pop(sid, None)
-        user_to_workspaceid[sid] = result["workspace_id"]
-
     logger.info(
-        "Received workspace %s with %s files",
+        "Received workspace %s with %s files for dedicated session %s",
         result["workspace_id"],
         result["file_count"],
+        RUNTIME_SESSION_ID,
     )
-    return {"ok": True, **result}
+    return {"ok": True, "session_id": RUNTIME_SESSION_ID, **result}
 
 
 @socketio.on("workspace_resume")
 def resume_workspace(sid, data):
     if not isinstance(data, dict) or not _authorized(data):
         return {"ok": False, "error": "Invalid API key."}
-    workspace_id = data.get("workspace_id") or CONTAINER_WORKSPACE_ID
+    workspace_id = data.get("workspace_id") or (current_session.workspace_id if current_session else CONTAINER_WORKSPACE_ID)
     if not isinstance(workspace_id, str) or not workspace_id:
         return {"ok": False, "error": "A workspace id is required."}
 
     api_key = data.get("apiKey") or data.get("apikey") or CONTAINER_USER_ID
     try:
-        session = _activate_workspace(sid, workspace_id, api_key)
+        session = init_dedicated_session(workspace_id, api_key)
     except LookupError:
         return {
             "ok": False,
@@ -734,6 +583,7 @@ def resume_workspace(sid, data):
         "ok": True,
         "workspace_id": session.workspace_id,
         "history": session.history,
+        "session_id": session.session_id,
     }
 
 
@@ -747,36 +597,31 @@ def receive_chat(sid, data):
         return {"ok": False, "error": "Enter a message before sending."}
     if "readme_mode" in data and not isinstance(data["readme_mode"], bool):
         return {"ok": False, "error": "README mode must be a boolean."}
+
     api_key = data.get("apiKey") or data.get("apikey") or CONTAINER_USER_ID
-    workspace_id = data.get("workspace_id") or CONTAINER_WORKSPACE_ID
-    if workspace_id is not None and not isinstance(workspace_id, str):
+    requested_workspace_id = data.get("workspace_id")
+    if requested_workspace_id is not None and not isinstance(requested_workspace_id, str):
         return {"ok": False, "error": "Workspace id must be a string."}
-    if workspace_id:
-        if not _session_matches(sid, workspace_id, api_key):
-            try:
-                _activate_workspace(sid, workspace_id, api_key)
-            except LookupError:
-                return {
-                    "ok": False,
-                    "error": "That workspace id is not available for this Nyxus user. Select a saved workspace or upload it again.",
-                }
-            except Exception:
-                logger.exception("Failed to activate workspace for chat")
-                return {"ok": False, "error": "The server could not load the requested workspace."}
-    elif sid not in user_to_workspaceid:
+
+    target_ws = requested_workspace_id or (current_session.workspace_id if current_session else CONTAINER_WORKSPACE_ID)
+    if not target_ws:
         return {
             "ok": False,
             "error": "A workspace is required. Upload one or provide a saved workspace id.",
         }
 
-    with _workspace_sessions_lock:
-        active_workspace_id = user_to_workspaceid.get(sid) or CONTAINER_WORKSPACE_ID
-    if not active_workspace_id:
-        return {
-            "ok": False,
-            "error": "A workspace is required. Upload one or provide a saved workspace id.",
-        }
-    _begin_workspace_task(active_workspace_id)
+    if not current_session or current_session.workspace_id != target_ws:
+        try:
+            init_dedicated_session(target_ws, api_key)
+        except LookupError:
+            return {
+                "ok": False,
+                "error": "That workspace id is not available for this Nyxus user. Select a saved workspace or upload it again.",
+            }
+        except Exception:
+            logger.exception("Failed to activate workspace for chat")
+            return {"ok": False, "error": "The server could not load the requested workspace."}
+
     try:
         socketio.emit("assistant_start", {}, to=sid)
         socketio.start_background_task(
@@ -784,12 +629,11 @@ def receive_chat(sid, data):
             sid,
             data["prompt"].strip(),
             api_key,
-            active_workspace_id,
+            current_session.workspace_id,
             data.get("readme_mode", False),
         )
     except Exception:
-        _end_workspace_task(active_workspace_id)
-        logger.exception("Could not start chat task for workspace %s", active_workspace_id)
+        logger.exception("Could not start chat task")
         socketio.emit(
             "assistant_error",
             {"error": "The server could not start this chat request. Please retry."},
@@ -803,23 +647,13 @@ def receive_chat(sid, data):
 def architecture_diagram_status(sid, data):
     if not isinstance(data, dict) or not _authorized(data):
         return {"ok": False, "error": "Invalid API key."}
-    workspace_id = data.get("workspace_id") or CONTAINER_WORKSPACE_ID
     status = data.get("status")
     if status not in {"rendered", "failed"}:
         return {"ok": False, "error": "Invalid diagram rendering status."}
-    if not _session_matches(
-        sid,
-        workspace_id,
-        data.get("apiKey") or data.get("apikey") or CONTAINER_USER_ID,
-    ):
-        return {"ok": False, "error": "Workspace session does not match."}
-    if workspace_id:
-        _touch_workspace(workspace_id)
 
     if status == "failed":
         logger.error(
-            "Architecture preview failed for workspace %s: %s",
-            workspace_id,
+            "Architecture preview failed: %s",
             str(data.get("error", "unknown client rendering error"))[:300],
         )
         socketio.emit(
@@ -829,8 +663,7 @@ def architecture_diagram_status(sid, data):
         )
     else:
         logger.info(
-            "Architecture preview rendered for workspace %s as %s",
-            workspace_id,
+            "Architecture preview rendered as %s",
             str(data.get("filename", ""))[:100],
         )
     return {"ok": True}
@@ -838,10 +671,7 @@ def architecture_diagram_status(sid, data):
 
 @socketio.on("disconnect")
 def disconnect_workspace(sid, *args):
-    with _workspace_sessions_lock:
-        user_to_workspaceid.pop(sid, None)
-        if not CONTAINER_WORKSPACE_ID:
-            workspace_sessions.pop(sid, None)
+    logger.info("Client disconnected: %s (dedicated session remains active)", sid)
 
 
 if __name__ == "__main__":
