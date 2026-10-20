@@ -3,7 +3,7 @@ import { rm } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { unpackWorkspaceWithPython } from "./ingestion/ingest.js";
-import getMongoStore from "./MongoStore.js";
+import getMongoStore from "../MongoStore.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STORAGE_ROOT = path.resolve(
