@@ -33,12 +33,12 @@ class MongoStore:
                 parsed_uri.fragment,
             ))
         "creates a mongod db client that can be used for crud operations"
-        self.client = MongoClient(
-            uri, 
-            username=username,
-            password=password,
-            serverSelectionTimeoutMS=5000,
-        )
+        client_kwargs = {"serverSelectionTimeoutMS": 5000}
+        if username:
+            client_kwargs["username"] = username
+        if password:
+            client_kwargs["password"] = password
+        self.client = MongoClient(uri, **client_kwargs)
         database_name = database or os.environ.get("MONGODB_DATABASE", "nyxus")
 
 
@@ -48,16 +48,8 @@ class MongoStore:
         self.conversations = self.database["conversations"]  
 
 
-        "creating archive bucket for performing gridfsoperations,its kind of a file driver that can store and retreive files and uses mongodb as its storage system"
-        
         self.archive_bucket = GridFSBucket(self.database, bucket_name="workspace_archives")
-        
-        "creating indexes in workspace for better retreival and indexing the database"
-        self.workspaces.create_index("workspace_id", unique=True)
-        self.workspaces.create_index([("user_id", 1), ("created_at", -1)])
-        self.conversations.create_index(
-            [("user_id", 1), ("workspace_id", 1), ("created_at", 1)]
-        )
+
 
     def ping(self):
         self.client.admin.command("ping")

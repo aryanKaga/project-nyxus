@@ -36,7 +36,14 @@ RUNTIME_SESSION_ID = f"sess-{uuid.uuid4().hex[:12]}"
 
 # Container environment configuration
 CONTAINER_WORKSPACE_ID = os.environ.get("WORKSPACE_ID") or os.environ.get("NYXUS_WORKSPACE_ID")
-CONTAINER_USER_ID = os.environ.get("USER_ID") or os.environ.get("NYXUS_USER_ID") or os.environ.get("NYXUS_API_KEY", "abc123")
+# Prefer NYXUS_API_KEY for workspace DB lookups — gateway injects this as the auth credential.
+# Fall back to USER_ID / NYXUS_USER_ID for backwards compatibility.
+CONTAINER_USER_ID = (
+    os.environ.get("NYXUS_API_KEY")
+    or os.environ.get("USER_ID")
+    or os.environ.get("NYXUS_USER_ID")
+    or "abc123"
+)
 EXPECTED_API_KEY = os.environ.get("NYXUS_API_KEY", "abc123")
 HOST = os.environ.get("NYXUS_HOST", os.environ.get("HOST", "0.0.0.0"))
 PORT = int(os.environ.get("PORT", os.environ.get("NYXUS_PORT", "3000")))
