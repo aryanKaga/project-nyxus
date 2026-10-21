@@ -461,6 +461,7 @@ async def gateway_chat(sid, data):
                 "workspace_id": workspace_id,
                 "api_key": api_key,
             }
+            print(client_sessions[sid])
             runtime_clients.setdefault(runtime_id, set()).add(sid)
 
     if not runtime_id:
