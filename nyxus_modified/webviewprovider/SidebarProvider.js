@@ -345,7 +345,7 @@ class SidebarProvider {
                             workspaceName: meta.customName || archiveResult.workspaceName,
                             customName: meta.customName,
                             description: meta.description,
-                            workspace_id: workspaceId
+                       
                         },
                         this.context
                     );
@@ -561,7 +561,10 @@ class SidebarProvider {
             try {
                 const apiKey = await require('./api_key_storage').getApiKey(this.context);
                 const userId = await getUserId(this.context);
-
+                const folderUri = vscode.workspace.workspaceFolders?.[0]?.uri;
+                const reuseId = vscode.workspace.getConfiguration('nyxusReplica').get('autoReuseWorkspaceId', true);
+                const storedWorkspaceId = reuseId && folderUri && this.context ? getStoredWorkspaceId(this.context, folderUri) : undefined;
+           
                 this.logFlow('request.chat');
                 this.socket.emit('chat', {
                     prompt,
@@ -569,7 +572,7 @@ class SidebarProvider {
                     apiKey: apiKey,
                     user_id: userId,
                     userId: userId,
-                    workspace_id:workspace_id
+                    workspace_id:storedWorkspaceId
                 });
             } catch (error) {
                 this.logFlow('request.chat.failed');
