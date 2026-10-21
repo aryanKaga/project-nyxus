@@ -569,6 +569,7 @@ class SidebarProvider {
                     apiKey: apiKey,
                     user_id: userId,
                     userId: userId,
+                    workspace_id:workspace_id
                 });
             } catch (error) {
                 this.logFlow('request.chat.failed');
