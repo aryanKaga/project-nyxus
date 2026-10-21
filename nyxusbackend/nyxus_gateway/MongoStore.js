@@ -21,7 +21,7 @@ export class MongoStore {
     }
     username = username || process.env.MONGODB_USERNAME;
     password = password || process.env.MONGODB_PASSWORD;
-
+    
     // If explicit credentials are supplied, strip any credentials embedded in the URI.
     const parsed = new URL(uri);
     if ((parsed.username || parsed.password) && (username || password)) {
