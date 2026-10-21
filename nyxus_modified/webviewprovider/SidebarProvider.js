@@ -10,7 +10,8 @@ const { getStoredWorkspaceId, saveStoredWorkspaceId, clearStoredWorkspaceId, get
 const { requestWorkspaceIdAssignment } = require('./assign_workspace_request');
 const { getApiKey, setApiKey } = require('./api_key_storage');
 const { getUserId, setUserId } = require('./user_id_storage');
-
+const { saveAnswerMarkdown, openAnswerMarkdownPreview } = require('./answer_markdown_file');
+const { saveArchitectureDiagram, openArchitectureDiagramPreview } = require('./architecture_diagram_file');
 
 class SidebarProvider {
     /**
@@ -527,6 +528,11 @@ class SidebarProvider {
                 return;
             }
 
+            if (message.type === 'open_readme_answer') {
+                void this.openReadmeAnswer(message.markdown);
+                return;
+            }
+
             if (message.type !== 'chat') {
                 this.logFlow('webview.message.unknown');
                 return;
@@ -572,7 +578,8 @@ class SidebarProvider {
                     apiKey: apiKey,
                     user_id: userId,
                     userId: userId,
-                    workspace_id:storedWorkspaceId
+                    workspace_id: storedWorkspaceId,
+                    readme_mode: message.readmeMode !== false
                 });
             } catch (error) {
                 this.logFlow('request.chat.failed');
@@ -590,7 +597,13 @@ class SidebarProvider {
         const webview = this._webview;
         const oldSocket = this.socket;
         try {
-            const socket = await createWebSocket(webview, this.logFlow.bind(this), this.context);
+            const socket = await createWebSocket(
+                webview,
+                this.logFlow.bind(this),
+                this.context,
+                (diagram) => this.saveAndRenderArchitectureDiagram(diagram),
+                (answer) => this.saveAndRenderReadmeAnswer(answer)
+            );
             if (this._webview !== webview) { socket.disconnect(); return; }
             this.socket = socket;
             socket.on('connect', () => {
@@ -602,6 +615,206 @@ class SidebarProvider {
             this.logFlow('socket.initialization.failed');
             this.output.appendLine(`Connection initialization error type: ${error instanceof Error ? error.name : 'UnknownError'}`);
         }
+    }
+
+    async saveAndRenderReadmeAnswer(message) {
+        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        const targetPath = workspaceRoot
+            ? path.join(workspaceRoot, 'answer.md')
+            : '(no active workspace path)';
+        this.output.appendLine(`Received README answer event; target file path: ${targetPath}.`);
+        try {
+            if (!workspaceRoot) {
+                throw new Error('Open a workspace folder to save the README answer.');
+            }
+            if (
+                message?.filename !== 'answer.md'
+                || typeof message.markdown !== 'string'
+            ) {
+                throw new Error('Invalid README answer payload.');
+            }
+            const saved = await saveAnswerMarkdown(
+                workspaceRoot,
+                message.filename,
+                message.markdown
+            );
+            this.output.appendLine(
+                `Verified README answer at ${saved.answerPath} (${saved.bytes} bytes); opening Markdown preview.`
+            );
+            await openAnswerMarkdownPreview(vscode, saved.answerPath);
+            this.output.appendLine(`Opened Markdown preview for ${saved.answerPath}.`);
+            this.logFlow('readme_answer.opened');
+        } catch (error) {
+            const detail = error instanceof Error ? error.message : String(error);
+            this.logFlow('readme_answer.open.failed');
+            this.output.appendLine(`README answer at ${targetPath} could not be saved or opened: ${detail}`);
+            this.sendMessage({
+                type: 'initialization_error',
+                text: `The README answer could not be saved or rendered: ${detail}`
+            });
+        }
+    }
+
+    async openReadmeAnswer(markdown) {
+        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!workspaceRoot) {
+            this.sendMessage({
+                type: 'initialization_error',
+                text: 'Open a workspace folder before opening answer.md.'
+            });
+            return;
+        }
+        try {
+            if (typeof markdown === 'string' && markdown.trim()) {
+                await saveAnswerMarkdown(workspaceRoot, 'answer.md', markdown);
+            }
+            const answerPath = path.join(workspaceRoot, 'answer.md');
+            const stat = await fs.promises.lstat(answerPath);
+            if (stat.isSymbolicLink() || !stat.isFile()) {
+                throw new Error('The README answer path must be a regular file.');
+            }
+            const realWorkspaceRoot = await fs.promises.realpath(workspaceRoot);
+            const realAnswerPath = await fs.promises.realpath(answerPath);
+            if (path.dirname(realAnswerPath) !== realWorkspaceRoot) {
+                throw new Error('The README answer path is outside the workspace.');
+            }
+            await openAnswerMarkdownPreview(vscode, realAnswerPath);
+            this.output.appendLine(`Reopened README Markdown preview at ${realAnswerPath}.`);
+        } catch (error) {
+            const detail = error instanceof Error ? error.message : String(error);
+            this.sendMessage({
+                type: 'initialization_error',
+                text: `Could not open answer.md: ${detail}`
+            });
+        }
+    }
+
+    async saveAndRenderArchitectureDiagram(message) {
+        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        const requestedPath = workspaceRoot && typeof message.filename === 'string'
+            ? path.resolve(
+                workspaceRoot,
+                '.nyxus',
+                'architecture-diagrams',
+                path.basename(message.filename)
+            )
+            : '(no active workspace path)';
+        this.output.appendLine(
+            `Received architecture HTML event; target file path: ${requestedPath}.`
+        );
+        if (
+            !workspaceRoot
+            || typeof message.filename !== 'string'
+            || typeof message.html !== 'string'
+            || Buffer.byteLength(message.html, 'utf8') > 2 * 1024 * 1024
+        ) {
+            const reason = typeof message.html === 'string'
+                && Buffer.byteLength(message.html, 'utf8') > 2 * 1024 * 1024
+                ? 'Architecture HTML exceeded the 2 MiB client limit.'
+                : 'Invalid diagram payload.';
+            this.reportArchitectureRender(message, 'failed', reason);
+            this.sendMessage({
+                type: 'initialization_error',
+                text: reason === 'Invalid diagram payload.'
+                    ? 'The architecture diagram could not be saved because its file data is invalid.'
+                    : 'The architecture diagram is too large to save in VS Code.'
+            });
+            return;
+        }
+        this.output.appendLine(
+            `Architecture HTML received from Nyxus: ${Buffer.byteLength(message.html, 'utf8')} bytes.`
+        );
+        const filename = path.basename(message.filename);
+        if (!/^[a-zA-Z0-9_-]+\.html$/.test(filename)) {
+            this.reportArchitectureRender(message, 'failed', 'Invalid diagram filename.');
+            this.sendMessage({
+                type: 'initialization_error',
+                text: 'The architecture diagram could not be saved because its filename is invalid.'
+            });
+            return;
+        }
+        if (/<\s*(script|iframe|object|embed|form)\b|\son[a-z]+\s*=|javascript\s*:/i.test(message.html)) {
+            this.reportArchitectureRender(message, 'failed', 'HTML contained active content.');
+            this.sendMessage({
+                type: 'initialization_error',
+                text: 'The architecture diagram contains unsupported active HTML and was not opened.'
+            });
+            return;
+        }
+
+        let savedDiagram;
+        try {
+            savedDiagram = await saveArchitectureDiagram(
+                workspaceRoot,
+                filename,
+                message.html
+            );
+            const savedStat = await fs.promises.stat(savedDiagram.diagramPath);
+            if (!savedStat.isFile()) {
+                throw new Error('The saved architecture path is not a file.');
+            }
+            this.output.appendLine(
+                `Verified architecture HTML exists at ${savedDiagram.diagramPath} (${savedStat.size} bytes); opening the VS Code preview.`
+            );
+            openArchitectureDiagramPreview(
+                vscode,
+                typeof message.title === 'string'
+                    ? message.title
+                    : 'Repository architecture',
+                message.html
+            );
+            this.output.appendLine(
+                `Opened architecture preview for ${savedDiagram.diagramPath}.`
+            );
+            this.logFlow('architecture_diagram.opened');
+            this.reportArchitectureRender(message, 'rendered');
+            vscode.window.showInformationMessage(
+                `Architecture diagram saved and opened: ${savedDiagram.diagramPath}`
+            );
+        } catch (error) {
+            this.logFlow('architecture_diagram.open.failed');
+            const detail = error instanceof Error ? error.message : String(error);
+            this.output.appendLine(
+                `Architecture diagram at ${requestedPath} ${savedDiagram ? 'was saved but could not be opened' : 'could not be saved'}: ${detail}`
+            );
+            this.reportArchitectureRender(
+                message,
+                'failed',
+                detail
+            );
+            this.sendMessage({
+                type: 'initialization_error',
+                text: savedDiagram
+                    ? `The architecture diagram was saved to ${savedDiagram.diagramPath}, but its preview could not be opened: ${detail}`
+                    : `The architecture HTML was received but could not be saved or opened: ${detail}`
+            });
+        }
+    }
+
+    async reportArchitectureRender(message, status, error) {
+        const folderUri = vscode.workspace.workspaceFolders?.[0]?.uri;
+        const workspaceId = folderUri && this.context ? getStoredWorkspaceId(this.context, folderUri) : undefined;
+        if (!this.socket?.connected || !workspaceId) {
+            this.output.appendLine('Architecture preview status could not be reported: Nyxus is disconnected or no workspace ID.');
+            return;
+        }
+        const apiKey = await getApiKey(this.context);
+        this.socket.emit('architecture_diagram_status', {
+            apikey: apiKey,
+            apiKey: apiKey,
+            workspace_id: workspaceId,
+            filename: typeof message.filename === 'string'
+                ? path.basename(message.filename)
+                : '',
+            status,
+            ...(error ? { error } : {})
+        }, (response) => {
+            if (!response?.ok) {
+                this.output.appendLine(
+                    `Architecture preview status was not acknowledged: ${response?.error || 'server unavailable'}`
+                );
+            }
+        });
     }
 
     /**

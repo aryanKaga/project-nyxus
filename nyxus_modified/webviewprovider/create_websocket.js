@@ -3,13 +3,17 @@ const vscode = require('vscode');
 const { io } = require('socket.io-client');
 const fs = require('fs');
 const path = require('path');
+
 /**
  * 
  * @param {*} webview 
  * @param {*} logFlow 
+ * @param {*} context 
+ * @param {*} onArchitectureDiagram 
+ * @param {*} onReadmeAnswer 
  * @returns 
  */
-async function createWebSocket(webview, logFlow, context) {
+async function createWebSocket(webview, logFlow, context, onArchitectureDiagram, onReadmeAnswer) {
     const { getApiKey } = require('./api_key_storage');
     const { getUserId } = require('./user_id_storage');
     const config = vscode.workspace.getConfiguration('nyxusReplica');
@@ -26,8 +30,8 @@ async function createWebSocket(webview, logFlow, context) {
         timeout: config.get('connectionTimeout', 15000),
         reconnectionDelay: config.get('reconnectionDelay', 1000)
     });
+
     /**
-     * 
      * @param {*} message 
      */
     const postMessage = (message) => {
@@ -78,9 +82,70 @@ async function createWebSocket(webview, logFlow, context) {
         postMessage({ type: 'assistant_chunk', text: data.token });
     });
 
+    socket.on('assistant_progress', (data) => {
+        postMessage({
+            type: 'assistant_progress',
+            message: typeof data?.message === 'string'
+                ? data.message
+                : 'Still working on your request…'
+        });
+    });
+
+    socket.on('architecture_diagram', (data) => {
+        if (
+            typeof data?.filename !== 'string'
+            || typeof data?.title !== 'string'
+            || typeof data?.html !== 'string'
+        ) {
+            logFlow('receive.architecture_diagram.invalid');
+            return;
+        }
+        logFlow('receive.architecture_diagram');
+        if (typeof onArchitectureDiagram === 'function') {
+            Promise.resolve().then(() => onArchitectureDiagram(data)).catch(() => {
+                logFlow('architecture_diagram.open.failed');
+                postMessage({
+                    type: 'initialization_error',
+                    text: 'The architecture HTML reached VS Code but could not be saved or opened.'
+                });
+            });
+        }
+    });
+
+    socket.on('readme_answer', (data) => {
+        if (data?.filename !== 'answer.md' || typeof data.markdown !== 'string') {
+            logFlow('receive.readme_answer.invalid');
+            return;
+        }
+        logFlow('receive.readme_answer');
+        postMessage({
+            type: 'readme_answer',
+            filename: data.filename,
+            markdown: data.markdown
+        });
+        if (typeof onReadmeAnswer === 'function') {
+            Promise.resolve().then(() => onReadmeAnswer(data)).catch((err) => {
+                logFlow('readme_answer.open.failed');
+                postMessage({
+                    type: 'initialization_error',
+                    text: `The README answer reached VS Code but could not be saved: ${err instanceof Error ? err.message : String(err)}`
+                });
+            });
+        }
+    });
+
     socket.on('assistant_end', () => {
         logFlow('receive.assistant_end');
         postMessage({ type: 'assistant_end' });
+    });
+
+    socket.on('agent_trace', (data) => {
+        if (!Array.isArray(data?.trace)) {
+            logFlow('receive.agent_trace.invalid');
+            return;
+        }
+        logFlow('receive.agent_trace');
+        postMessage({ type: 'agent_trace', trace: data.trace });
     });
 
     socket.on('assistant_error', (data) => {

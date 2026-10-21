@@ -22,11 +22,18 @@ export default function NyxusChat({ onOpenSettings }) {
       />
       <MessageList
         isStreaming={chat.isStreaming}
+        isReadmeStreaming={chat.isReadmeStreaming}
         messages={chat.messages}
         messagesEndRef={chat.messagesEndRef}
+        onOpenAnswer={chat.openReadmeAnswer}
         streamingText={chat.streamingText}
       />
-      <ChatInput disabled={chat.isStreaming} onSend={chat.sendMessage} />
+      <ChatInput
+        disabled={chat.isStreaming}
+        onSend={chat.sendMessage}
+        readmeMode={chat.readmeMode}
+        onReadmeModeChange={chat.setReadmeMode}
+      />
     </main>
   );
 }
