@@ -12,6 +12,7 @@ export default function Setting({ onBack }) {
     folderPath: "",
     customName: "",
     description: "",
+    staged: false,
     apiKey: "",
     hasApiKey: false,
     userId: "",
@@ -41,6 +42,7 @@ export default function Setting({ onBack }) {
             folderPath: message.folderPath || "",
             customName: message.customName || "",
             description: message.description || "",
+            staged: Boolean(message.staged),
             apiKey: message.apiKey || "",
             hasApiKey: Boolean(message.hasApiKey),
             userId: message.userId || message.user_id || "",
@@ -110,18 +112,32 @@ export default function Setting({ onBack }) {
           break;
 
         case "clear_workspace_id_result":
-          setWorkspaceInfo((prev) => ({ ...prev, workspaceId: "" }));
+          setWorkspaceInfo((prev) => ({ ...prev, workspaceId: "", staged: false }));
           setStatusMsg({ type: "info", text: "Workspace ID cleared for this folder." });
           break;
 
         case "workspace_git_action_result":
           setLoading(false);
-          if (message.ok && message.action === "unstage_workspace") {
-            setWorkspaceInfo((prev) => ({ ...prev, workspaceId: "" }));
-            vscode.postMessage({ type: "get_workspace_info" });
+          if (message.ok) {
+            if (message.action === "unstage_workspace") {
+              setWorkspaceInfo((prev) => ({ ...prev, workspaceId: "", staged: false }));
+              vscode.postMessage({ type: "get_workspace_info" });
+            } else if (message.action === "stage_workspace" || message.action === "sync_workspace") {
+              setWorkspaceInfo((prev) => ({ ...prev, staged: true }));
+              vscode.postMessage({ type: "get_workspace_info" });
+            }
           }
           setStatusMsg(message.ok
-            ? { type: "success", text: message.message || (message.action === "stage_workspace" ? "Workspace staged and uploaded." : "Workspace unstaged and deleted from server.") }
+            ? {
+                type: "success",
+                text: message.message || (
+                  message.action === "stage_workspace"
+                    ? "Workspace staged and uploaded."
+                    : message.action === "sync_workspace"
+                    ? "Workspace synced."
+                    : "Workspace unstaged and deleted from server."
+                )
+              }
             : { type: "error", text: message.error || "Workspace action failed." });
           break;
 
@@ -149,7 +165,11 @@ export default function Setting({ onBack }) {
     setLoading(true);
     setStatusMsg({
       type: "info",
-      text: type === "stage_workspace" ? "Staging and uploading workspace..." : "Unstaging workspace and deleting from server..."
+      text: type === "stage_workspace"
+        ? "Staging and uploading workspace..."
+        : type === "sync_workspace"
+        ? "Syncing workspace indexing and data..."
+        : "Unstaging workspace and deleting from server..."
     });
     vscode.postMessage({ type, workspaceId: workspaceInfo.workspaceId });
   };
@@ -389,13 +409,18 @@ export default function Setting({ onBack }) {
           {activeTab === "workspace" && (
             <>
               {/* Workspace ID Setting */}
-              {matchesSearch("Workspace ID static assign") && (
+              {matchesSearch("Workspace ID static assign stage sync unstage") && (
                 <div className="vscode-setting-item">
                   <div className="vscode-setting-title">
                     Nyxus › Workspace: <span className="highlight">Workspace ID</span>
                   </div>
                   <div className="vscode-setting-description">
                     Server-assigned static ID for this workspace. Identifies and binds local project archives with server-side workspace memory.
+                    {workspaceInfo.staged && (
+                      <span style={{ display: "block", marginTop: 4, color: "#4ec9b0", fontWeight: 600 }}>
+                        ✓ Workspace is currently staged and ready on Nyxus server.
+                      </span>
+                    )}
                   </div>
 
                   <div className="vscode-setting-control-row">
@@ -437,8 +462,36 @@ export default function Setting({ onBack }) {
 
                   </div>
                   <div className="vscode-setting-actions">
-                    <button type="button" className="vscode-setting-action-btn" disabled={loading} onClick={() => handleWorkspaceGitAction("stage_workspace")}>Stage Workspace</button>
-                    <button type="button" className="vscode-setting-action-btn" disabled={loading} onClick={() => handleWorkspaceGitAction("unstage_workspace")}>Unstage Workspace</button>
+                    {workspaceInfo.staged ? (
+                      <button
+                        type="button"
+                        className="vscode-setting-action-btn"
+                        disabled={loading}
+                        onClick={() => handleWorkspaceGitAction("sync_workspace")}
+                        title="Sync workspace indexing and data with Nyxus"
+                      >
+                        Sync Workspace
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="vscode-setting-action-btn"
+                        disabled={loading}
+                        onClick={() => handleWorkspaceGitAction("stage_workspace")}
+                        title="Stage and upload workspace to Nyxus"
+                      >
+                        Stage Workspace
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="vscode-setting-action-btn"
+                      disabled={loading}
+                      onClick={() => handleWorkspaceGitAction("unstage_workspace")}
+                      title="Unstage workspace and delete from server"
+                    >
+                      Unstage Workspace
+                    </button>
                   </div>
                 </div>
               )}

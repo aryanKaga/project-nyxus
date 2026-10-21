@@ -6,7 +6,7 @@ const { create_workspace_archive } = require('./workspace_archive');
 const { send_workspace_data } = require('./send_nyxus_data');
 const { createWebSocket } = require('./create_websocket');
 const { createFlowLogger } = require('./flowLogger');
-const { getStoredWorkspaceId, saveStoredWorkspaceId, clearStoredWorkspaceId, getStoredWorkspaceMeta, saveStoredWorkspaceMeta } = require('./workspace_storage');
+const { getStoredWorkspaceId, saveStoredWorkspaceId, clearStoredWorkspaceId, getStoredWorkspaceMeta, saveStoredWorkspaceMeta, getStoredWorkspaceStaged, setStoredWorkspaceStaged } = require('./workspace_storage');
 const { requestWorkspaceIdAssignment } = require('./assign_workspace_request');
 const { getApiKey, setApiKey } = require('./api_key_storage');
 const { getUserId, setUserId } = require('./user_id_storage');
@@ -55,9 +55,23 @@ class SidebarProvider {
     }
 
     /**
+     * @param {boolean} [force]
      * @returns {Promise<void>}
      */
-    async prepareWorkspace() {
+    async prepareWorkspace(force = false) {
+        const folder = vscode.workspace.workspaceFolders?.[0];
+        const isStaged = !force && folder && this.context ? getStoredWorkspaceStaged(this.context, folder.uri) : false;
+        if (isStaged) {
+            this.workspaceReady = true;
+            this.workspaceDataSent = true;
+            this.workspaceStatus = {
+                status: 'ready',
+                text: 'Workspace is already staged and ready.'
+            };
+            this.sendMessage({ type: 'workspace_sync_status', ...this.workspaceStatus });
+            return;
+        }
+
         if (this.workspacePromise) {
             return this.workspacePromise;
         }
@@ -128,7 +142,7 @@ class SidebarProvider {
             const folderUri = vscode.workspace.workspaceFolders?.[0]?.uri;
             const reuseId = vscode.workspace.getConfiguration('nyxusReplica').get('autoReuseWorkspaceId', true);
             const storedWorkspaceId = reuseId && folderUri && this.context ? getStoredWorkspaceId(this.context, folderUri) : undefined;
-            const meta = folderUri && this.context ? getStoredWorkspaceMeta(this.context, folderUri) : { customName: '', description: '' };
+            const meta = folderUri && this.context ? getStoredWorkspaceMeta(this.context, folderUri) : { customName: '', description: '', staged: false };
 
             const result = await send_workspace_data(this.logFlow.bind(this), {
                 archive: this.workspaceArchive,
@@ -139,6 +153,9 @@ class SidebarProvider {
                 workspace_id: storedWorkspaceId
             }, this.context);
             this.workspaceDataSent = true;
+            if (folderUri && this.context) {
+                await setStoredWorkspaceStaged(this.context, folderUri, true);
+            }
             this.workspaceStatus = {
                 status: 'ready',
                 text: `Synced ${result.fileCount} files from ${result.workspaceName}.${this.workspaceCommitCreated ? ' A local Git commit was created.' : ' No new Git commit was needed.'}`
@@ -201,22 +218,36 @@ class SidebarProvider {
         }
 
         try {
-            /**
-             * when ever a  new socket arrives it disconnects with the server  amd starts fresh
-             */
+            const folder = vscode.workspace.workspaceFolders?.[0];
+            const isStaged = folder && this.context ? getStoredWorkspaceStaged(this.context, folder.uri) : false;
+
             this.socket?.disconnect();
-            this.workspaceDataSent = false;
             this.workspacePromise = undefined;
-            this.workspaceReady = false;
             this.workspaceArchive = undefined;
+
+            if (isStaged) {
+                this.workspaceReady = true;
+                this.workspaceDataSent = true;
+                this.workspaceStatus = {
+                    status: 'ready',
+                    text: 'Workspace is already staged and ready.'
+                };
+            } else {
+                this.workspaceReady = false;
+                this.workspaceDataSent = false;
+                this.workspaceStatus = {
+                    status: 'waiting',
+                    text: 'Git workspace sync will start when the sidebar opens.'
+                };
+            }
+
             void this.reconnect();
-            /**
-             * sends nyxus data every time the user connects to the server, bad point because if the 
-             * server already has the user data it will still send it
-             */
-            const config = vscode.workspace.getConfiguration('nyxusReplica');
-            if (config.get('enableWorkspaceSync', true) && config.get('workspaceSyncBehavior', 'onSidebarOpen') === 'onSidebarOpen') {
-                void this.prepareWorkspace();
+
+            if (!isStaged) {
+                const config = vscode.workspace.getConfiguration('nyxusReplica');
+                if (config.get('enableWorkspaceSync', true) && config.get('workspaceSyncBehavior', 'onSidebarOpen') === 'onSidebarOpen') {
+                    void this.prepareWorkspace();
+                }
             }
         } catch (error) {
             this.logFlow('socket.initialization.failed');
@@ -245,7 +276,7 @@ class SidebarProvider {
                 const folderName = folder?.name || '';
                 const folderPath = folderUri?.fsPath || '';
                 const workspaceId = folderUri && this.context ? (getStoredWorkspaceId(this.context, folderUri) || '') : '';
-                const meta = folderUri && this.context ? getStoredWorkspaceMeta(this.context, folderUri) : { customName: '', description: '' };
+                const meta = folderUri && this.context ? getStoredWorkspaceMeta(this.context, folderUri) : { customName: '', description: '', staged: false };
                 const apiKey = await getApiKey(this.context);
                 const userId = await getUserId(this.context);
                 this.sendMessage({
@@ -255,6 +286,7 @@ class SidebarProvider {
                     workspaceId,
                     customName: meta.customName,
                     description: meta.description,
+                    staged: Boolean(meta.staged),
                     apiKey,
                     hasApiKey: Boolean(apiKey),
                     userId,
@@ -309,13 +341,15 @@ class SidebarProvider {
                 return;
             }
 
-            if (message.type === 'stage_workspace') {
+            if (message.type === 'stage_workspace' || message.type === 'sync_workspace') {
+                const isSync = message.type === 'sync_workspace';
+                const actionName = isSync ? 'sync_workspace' : 'stage_workspace';
                 const folder = vscode.workspace.workspaceFolders?.[0];
                 if (!folder) {
                     this.sendMessage({
                         type: 'workspace_git_action_result',
                         ok: false,
-                        action: 'stage_workspace',
+                        action: actionName,
                         error: 'Open a workspace folder first.'
                     });
                     return;
@@ -327,7 +361,7 @@ class SidebarProvider {
                     this.sendMessage({
                         type: 'workspace_git_action_result',
                         ok: false,
-                        action: 'stage_workspace',
+                        action: actionName,
                         error: 'No Workspace ID assigned. Please request a Workspace ID before staging.'
                     });
                     return;
@@ -336,7 +370,7 @@ class SidebarProvider {
                 try {
                     const { create_workspace_archive } = require('./workspace_archive');
                     const archiveResult = await create_workspace_archive(workspaceRoot);
-                    const meta = folder && this.context ? getStoredWorkspaceMeta(this.context, folder.uri) : { customName: '', description: '' };
+                    const meta = folder && this.context ? getStoredWorkspaceMeta(this.context, folder.uri) : { customName: '', description: '', staged: false };
 
                     const result = await send_workspace_data(
                         this.logFlow.bind(this),
@@ -346,11 +380,14 @@ class SidebarProvider {
                             workspaceName: meta.customName || archiveResult.workspaceName,
                             customName: meta.customName,
                             description: meta.description,
-                       
+                            workspace_id: workspaceId
                         },
                         this.context
                     );
 
+                    await setStoredWorkspaceStaged(this.context, folder.uri, true);
+
+                    this.workspaceReady = true;
                     this.workspaceDataSent = true;
                     this.workspaceStatus = {
                         status: 'ready',
@@ -361,17 +398,43 @@ class SidebarProvider {
                     this.sendMessage({
                         type: 'workspace_git_action_result',
                         ok: true,
-                        action: 'stage_workspace',
-                        message: `Workspace staged and uploaded (${result.fileCount} files).`
+                        action: actionName,
+                        staged: true,
+                        message: isSync
+                            ? `Workspace synced and updated (${result.fileCount} files).`
+                            : `Workspace staged and uploaded (${result.fileCount} files).`
                     });
-                    vscode.window.showInformationMessage(`Nyxus: Workspace staged and synced (${result.fileCount} files).`);
+
+                    // Send updated workspace info to update UI
+                    const updatedMeta = getStoredWorkspaceMeta(this.context, folder.uri);
+                    const apiKey = await getApiKey(this.context);
+                    const userId = await getUserId(this.context);
+                    this.sendMessage({
+                        type: 'workspace_info',
+                        folderName: folder.name || '',
+                        folderPath: folder.uri.fsPath || '',
+                        workspaceId,
+                        customName: updatedMeta.customName,
+                        description: updatedMeta.description,
+                        staged: true,
+                        apiKey,
+                        hasApiKey: Boolean(apiKey),
+                        userId,
+                        user_id: userId
+                    });
+
+                    vscode.window.showInformationMessage(
+                        isSync
+                            ? `Nyxus: Workspace synced (${result.fileCount} files).`
+                            : `Nyxus: Workspace staged and synced (${result.fileCount} files).`
+                    );
                 } catch (error) {
                     const detail = error instanceof Error ? error.message : String(error);
-                    this.output.appendLine(`Stage workspace failed: ${detail}`);
+                    this.output.appendLine(`${isSync ? 'Sync' : 'Stage'} workspace failed: ${detail}`);
                     this.sendMessage({
                         type: 'workspace_git_action_result',
                         ok: false,
-                        action: 'stage_workspace',
+                        action: actionName,
                         error: detail
                     });
                 }
@@ -407,16 +470,25 @@ class SidebarProvider {
                     }
 
                     await clearStoredWorkspaceId(this.context, folder.uri);
+                    await setStoredWorkspaceStaged(this.context, folder.uri, false);
+                    this.workspaceReady = false;
+                    this.workspaceDataSent = false;
+                    this.workspaceStatus = {
+                        status: 'waiting',
+                        text: 'Workspace is unstaged.'
+                    };
+                    this.sendMessage({ type: 'workspace_sync_status', ...this.workspaceStatus });
 
                     this.sendMessage({
                         type: 'workspace_git_action_result',
                         ok: true,
                         action: 'unstage_workspace',
+                        staged: false,
                         message: 'Workspace unstaged and deleted from server.'
                     });
 
                     // Send updated workspace info to update UI
-                    const meta = folder && this.context ? getStoredWorkspaceMeta(this.context, folder.uri) : { customName: '', description: '' };
+                    const meta = folder && this.context ? getStoredWorkspaceMeta(this.context, folder.uri) : { customName: '', description: '', staged: false };
                     this.sendMessage({
                         type: 'workspace_info',
                         folderName: folder.name || '',
@@ -424,6 +496,7 @@ class SidebarProvider {
                         workspaceId: '',
                         customName: meta.customName,
                         description: meta.description,
+                        staged: false,
                         apiKey,
                         hasApiKey: Boolean(apiKey),
                         userId,
@@ -506,6 +579,9 @@ class SidebarProvider {
                 const folder = vscode.workspace.workspaceFolders?.[0];
                 if (folder && this.context) {
                     await clearStoredWorkspaceId(this.context, folder.uri);
+                    await setStoredWorkspaceStaged(this.context, folder.uri, false);
+                    this.workspaceReady = false;
+                    this.workspaceDataSent = false;
                 }
                 this.sendMessage({
                     type: 'clear_workspace_id_result',
@@ -517,6 +593,16 @@ class SidebarProvider {
 
             if (message.type === 'webview_ready') {
                 this.webviewReady = true;
+                const folder = vscode.workspace.workspaceFolders?.[0];
+                const isStaged = folder && this.context ? getStoredWorkspaceStaged(this.context, folder.uri) : false;
+                if (isStaged) {
+                    this.workspaceReady = true;
+                    this.workspaceDataSent = true;
+                    this.workspaceStatus = {
+                        status: 'ready',
+                        text: 'Workspace is already staged and ready.'
+                    };
+                }
                 this.sendMessage({
                     type: 'connection_status',
                     status: this.socket?.connected ? 'connected' : 'disconnected',
@@ -554,14 +640,21 @@ class SidebarProvider {
             }
 
             if (!this.workspaceDataSent) {
-                this.logFlow('request.chat.blocked.workspace_not_ready');
-                this.sendMessage({
-                    type: 'assistant_error',
-                    error: this.workspaceStatus.status === 'error'
-                        ? this.workspaceStatus.text
-                        : 'Workspace sync is still in progress. Wait for the Git transfer to finish and try again.'
-                });
-                return;
+                const folder = vscode.workspace.workspaceFolders?.[0];
+                const isStaged = folder && this.context ? getStoredWorkspaceStaged(this.context, folder.uri) : false;
+                if (isStaged) {
+                    this.workspaceReady = true;
+                    this.workspaceDataSent = true;
+                } else {
+                    this.logFlow('request.chat.blocked.workspace_not_ready');
+                    this.sendMessage({
+                        type: 'assistant_error',
+                        error: this.workspaceStatus.status === 'error'
+                            ? this.workspaceStatus.text
+                            : 'Workspace sync is still in progress. Wait for the Git transfer to finish and try again.'
+                    });
+                    return;
+                }
             }
 
             try {
@@ -607,8 +700,20 @@ class SidebarProvider {
             if (this._webview !== webview) { socket.disconnect(); return; }
             this.socket = socket;
             socket.on('connect', () => {
-                this.workspaceDataSent = false;
-                void this.sendWorkspaceData();
+                const folder = vscode.workspace.workspaceFolders?.[0];
+                const isStaged = folder && this.context ? getStoredWorkspaceStaged(this.context, folder.uri) : false;
+                if (isStaged) {
+                    this.workspaceReady = true;
+                    this.workspaceDataSent = true;
+                    this.workspaceStatus = {
+                        status: 'ready',
+                        text: 'Workspace is already staged and ready.'
+                    };
+                    this.sendMessage({ type: 'workspace_sync_status', ...this.workspaceStatus });
+                } else {
+                    this.workspaceDataSent = false;
+                    void this.sendWorkspaceData();
+                }
             });
             oldSocket?.disconnect();
         } catch (error) {

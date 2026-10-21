@@ -77,7 +77,7 @@ test('workspace_storage saves and retrieves customName and description metadata'
     const context = createMockContext();
     const folder = { toString: () => 'file:///workspaces/repo-meta' };
 
-    assert.deepEqual(getStoredWorkspaceMeta(context, folder), { customName: '', description: '' });
+    assert.deepEqual(getStoredWorkspaceMeta(context, folder), { customName: '', description: '', staged: false });
 
     await saveStoredWorkspaceMeta(context, folder, {
         customName: '  My API Server  ',
@@ -86,6 +86,22 @@ test('workspace_storage saves and retrieves customName and description metadata'
 
     assert.deepEqual(getStoredWorkspaceMeta(context, folder), {
         customName: 'My API Server',
-        description: 'Core auth service'
+        description: 'Core auth service',
+        staged: false
     });
 });
+
+test('workspace_storage manages staged flag', async () => {
+    const context = createMockContext();
+    const folder = { toString: () => 'file:///workspaces/repo-staged' };
+    const { getStoredWorkspaceStaged, setStoredWorkspaceStaged } = require('../../webviewprovider/workspace_storage');
+
+    assert.equal(getStoredWorkspaceStaged(context, folder), false);
+
+    await setStoredWorkspaceStaged(context, folder, true);
+    assert.equal(getStoredWorkspaceStaged(context, folder), true);
+
+    await setStoredWorkspaceStaged(context, folder, false);
+    assert.equal(getStoredWorkspaceStaged(context, folder), false);
+});
+

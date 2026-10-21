@@ -1,8 +1,8 @@
 const vscode = require('vscode');
 const path = require('path');
-const fs = require('fs');
-const { getStoredWorkspaceId, saveStoredWorkspaceId, clearStoredWorkspaceId } = require('./workspace_storage');
+const { getStoredWorkspaceId, saveStoredWorkspaceId, clearStoredWorkspaceId, getStoredWorkspaceMeta, saveStoredWorkspaceMeta, getStoredWorkspaceStaged, setStoredWorkspaceStaged } = require('./workspace_storage');
 const { requestWorkspaceIdAssignment } = require('./assign_workspace_request');
+
 
 class SettingsViewProvider {
     /**
@@ -65,7 +65,8 @@ class SettingsViewProvider {
                     await this._handleRequestWorkspaceId();
                     break;
                 }
-                case 'stage_workspace': {
+                case 'stage_workspace':
+                case 'sync_workspace': {
                     await this._handleStageWorkspace(message);
                     break;
                 }
@@ -93,6 +94,7 @@ class SettingsViewProvider {
         const folderName = folder?.name || '';
         const folderPath = folderUri?.fsPath || '';
         const workspaceId = folderUri && this.context ? (getStoredWorkspaceId(this.context, folderUri) || '') : '';
+        const meta = folderUri && this.context ? getStoredWorkspaceMeta(this.context, folderUri) : { customName: '', description: '', staged: false };
         const config = vscode.workspace.getConfiguration('nyxusReplica');
         const serverUrl = config.get('url') || '';
         const userId = await require('./user_id_storage').getUserId(this.context);
@@ -103,6 +105,9 @@ class SettingsViewProvider {
             folderName,
             folderPath,
             workspaceId,
+            customName: meta.customName,
+            description: meta.description,
+            staged: Boolean(meta.staged),
             serverUrl,
             userId,
             user_id: userId,
@@ -178,12 +183,14 @@ class SettingsViewProvider {
      * @private
      */
     async _handleStageWorkspace(message) {
+        const isSync = message?.type === 'sync_workspace';
+        const actionName = isSync ? 'sync_workspace' : 'stage_workspace';
         const folder = vscode.workspace.workspaceFolders?.[0];
         if (!folder) {
             this.sendMessage({
                 type: 'workspace_git_action_result',
                 ok: false,
-                action: 'stage_workspace',
+                action: actionName,
                 error: 'Open a workspace folder first.'
             });
             return;
@@ -195,18 +202,18 @@ class SettingsViewProvider {
             this.sendMessage({
                 type: 'workspace_git_action_result',
                 ok: false,
-                action: 'stage_workspace',
+                action: actionName,
                 error: 'No Workspace ID assigned. Please request a Workspace ID before staging.'
             });
             return;
         }
 
         try {
-            this.output.appendLine(`Staging workspace: archiving files for ${workspaceRoot}...`);
+            this.output.appendLine(`${isSync ? 'Syncing' : 'Staging'} workspace: archiving files for ${workspaceRoot}...`);
             const { create_workspace_archive } = require('./workspace_archive');
             const archiveResult = await create_workspace_archive(workspaceRoot);
 
-            const meta = folder && this.context ? getStoredWorkspaceMeta(this.context, folder.uri) : { customName: '', description: '' };
+            const meta = folder && this.context ? getStoredWorkspaceMeta(this.context, folder.uri) : { customName: '', description: '', staged: false };
             const { send_workspace_data } = require('./send_nyxus_data');
 
             this.output.appendLine(`Uploading workspace archive (${archiveResult.fileCount} files) with workspace ID ${workspaceId}...`);
@@ -223,21 +230,31 @@ class SettingsViewProvider {
                 this.context
             );
 
-            this.output.appendLine(`Workspace staged and uploaded successfully: ${result.fileCount} files.`);
+            await setStoredWorkspaceStaged(this.context, folder.uri, true);
+
+            this.output.appendLine(`Workspace ${isSync ? 'synced' : 'staged and uploaded'} successfully: ${result.fileCount} files.`);
             this.sendMessage({
                 type: 'workspace_git_action_result',
                 ok: true,
-                action: 'stage_workspace',
-                message: `Workspace staged and uploaded (${result.fileCount} files).`
+                action: actionName,
+                staged: true,
+                message: isSync
+                    ? `Workspace synced and updated (${result.fileCount} files).`
+                    : `Workspace staged and uploaded (${result.fileCount} files).`
             });
-            vscode.window.showInformationMessage(`Nyxus: Workspace staged and synced (${result.fileCount} files).`);
+            await this._sendWorkspaceInfo();
+            vscode.window.showInformationMessage(
+                isSync
+                    ? `Nyxus: Workspace synced (${result.fileCount} files).`
+                    : `Nyxus: Workspace staged and synced (${result.fileCount} files).`
+            );
         } catch (error) {
             const detail = error instanceof Error ? error.message : String(error);
-            this.output.appendLine(`Stage workspace failed: ${detail}`);
+            this.output.appendLine(`${isSync ? 'Sync' : 'Stage'} workspace failed: ${detail}`);
             this.sendMessage({
                 type: 'workspace_git_action_result',
                 ok: false,
-                action: 'stage_workspace',
+                action: actionName,
                 error: detail
             });
         }
@@ -278,14 +295,16 @@ class SettingsViewProvider {
                 this.output.appendLine(`Server confirmed deletion of workspace: ${workspaceId}`);
             }
 
-            // Remove the local stored workspace ID
+            // Remove the local stored workspace ID and clear staged
             await clearStoredWorkspaceId(this.context, folder.uri);
-            this.output.appendLine(`Cleared local workspace ID for ${folder.uri.toString()}`);
+            await setStoredWorkspaceStaged(this.context, folder.uri, false);
+            this.output.appendLine(`Cleared local workspace ID and staged status for ${folder.uri.toString()}`);
 
             this.sendMessage({
                 type: 'workspace_git_action_result',
                 ok: true,
                 action: 'unstage_workspace',
+                staged: false,
                 message: 'Workspace unstaged and deleted from server.'
             });
 
@@ -313,6 +332,7 @@ class SettingsViewProvider {
         const folder = vscode.workspace.workspaceFolders?.[0];
         if (folder) {
             await clearStoredWorkspaceId(this.context, folder.uri);
+            await setStoredWorkspaceStaged(this.context, folder.uri, false);
             this.output.appendLine(`Settings: Cleared workspace ID for ${folder.uri.toString()}`);
         }
         this.sendMessage({

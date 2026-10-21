@@ -68,28 +68,29 @@ function getWorkspaceMetaStorageKey(folderUri) {
 }
 
 /**
- * Retrieves the stored workspace metadata (customName, description) for a folder URI.
+ * Retrieves the stored workspace metadata (customName, description, staged) for a folder URI.
  * @param {import('vscode').ExtensionContext} context
  * @param {import('vscode').Uri | string} folderUri
- * @returns {{ customName: string, description: string }}
+ * @returns {{ customName: string, description: string, staged: boolean }}
  */
 function getStoredWorkspaceMeta(context, folderUri) {
     if (!context || !folderUri) {
-        return { customName: '', description: '' };
+        return { customName: '', description: '', staged: false };
     }
     const key = getWorkspaceMetaStorageKey(folderUri);
     const meta = context.globalState.get(key) || {};
     return {
         customName: typeof meta.customName === 'string' ? meta.customName : '',
-        description: typeof meta.description === 'string' ? meta.description : ''
+        description: typeof meta.description === 'string' ? meta.description : '',
+        staged: Boolean(meta.staged)
     };
 }
 
 /**
- * Saves workspace metadata (customName, description) for a folder URI.
+ * Saves workspace metadata (customName, description, staged) for a folder URI.
  * @param {import('vscode').ExtensionContext} context
  * @param {import('vscode').Uri | string} folderUri
- * @param {{ customName?: string, description?: string }} meta
+ * @param {{ customName?: string, description?: string, staged?: boolean }} meta
  * @returns {Promise<boolean>}
  */
 async function saveStoredWorkspaceMeta(context, folderUri, meta) {
@@ -97,11 +98,22 @@ async function saveStoredWorkspaceMeta(context, folderUri, meta) {
         throw new Error('Invalid arguments for saving workspace metadata.');
     }
     const key = getWorkspaceMetaStorageKey(folderUri);
+    const existing = getStoredWorkspaceMeta(context, folderUri);
     await context.globalState.update(key, {
-        customName: typeof meta?.customName === 'string' ? meta.customName.trim() : '',
-        description: typeof meta?.description === 'string' ? meta.description.trim() : ''
+        customName: typeof meta?.customName === 'string' ? meta.customName.trim() : existing.customName,
+        description: typeof meta?.description === 'string' ? meta.description.trim() : existing.description,
+        staged: meta && meta.staged !== undefined ? Boolean(meta.staged) : existing.staged
     });
     return true;
+}
+
+function getStoredWorkspaceStaged(context, folderUri) {
+    return getStoredWorkspaceMeta(context, folderUri).staged;
+}
+
+async function setStoredWorkspaceStaged(context, folderUri, staged) {
+    const meta = getStoredWorkspaceMeta(context, folderUri);
+    return saveStoredWorkspaceMeta(context, folderUri, { ...meta, staged: Boolean(staged) });
 }
 
 module.exports = {
@@ -110,5 +122,8 @@ module.exports = {
     saveStoredWorkspaceId,
     clearStoredWorkspaceId,
     getStoredWorkspaceMeta,
-    saveStoredWorkspaceMeta
+    saveStoredWorkspaceMeta,
+    getStoredWorkspaceStaged,
+    setStoredWorkspaceStaged
 };
+
