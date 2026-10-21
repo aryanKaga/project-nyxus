@@ -1,0 +1,1 @@
+Git workspace transfer failed: This folder’s Workspace ID is already in use on the Nyxus server. In Settings, clear this folder’s Workspace ID, request a new ID, then retry the Git transfer.
