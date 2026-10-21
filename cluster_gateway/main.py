@@ -262,6 +262,7 @@ def create_pod(ref: WorkspaceRef, runtime_id: str) -> None:
                 client.V1Container(
                     name="agent",
                     image=AGENT_IMAGE,
+                    image_pull_policy="IfNotPresent",
                     ports=[client.V1ContainerPort(container_port=AGENT_PORT, name="http-socketio")],
                     env=env,
                     env_from=env_from if env_from else None,
