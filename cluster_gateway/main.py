@@ -440,7 +440,7 @@ async def gateway_workspace_resume(sid, data):
 
 @sio.on("chat")
 async def gateway_chat(sid, data):
-    print('request came on this')
+    print('sid is',sid,'and data is',data)
     """Client sends a chat message."""
     if not isinstance(data, dict):
         return {"ok": False, "error": "Invalid chat request."}
@@ -474,7 +474,7 @@ async def gateway_chat(sid, data):
             api_key = session.get("api_key") if session else data.get("apiKey", "default")
             ref = WorkspaceRef(user_id=user_id, workspace_id=workspace_id, api_key=api_key)
             pod, _, _ = await asyncio.to_thread(ensure_runtime, ref)
-
+        print('found pod and now sending request')
         agent_client = await get_or_connect_agent(runtime_id, pod)
         ack = await agent_client.call("chat", data, timeout=30)
         return ack

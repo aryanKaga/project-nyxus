@@ -33,7 +33,7 @@ async function assign_workspace_id(user_id) {
 
 id_router.post("/request_id", async (req, res) => {
     console.log('request came for generating a workspace ids')
-    console.log(req.body.user_id,req.user_id)
+    
     try {
         const user_id = req.user.user_id;
         console.log(req.body)
