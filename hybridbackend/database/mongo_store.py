@@ -32,8 +32,12 @@ class MongoStore:
                 parsed_uri.query,
                 parsed_uri.fragment,
             ))
-        "creates a mongod db client that can be used for crud operations"
-        client_kwargs = {"serverSelectionTimeoutMS": 5000}
+        timeout_ms = int(os.environ.get("MONGODB_TIMEOUT_MS", "30000"))
+        client_kwargs = {
+            "serverSelectionTimeoutMS": timeout_ms,
+            "connectTimeoutMS": min(timeout_ms, 20000),
+            "socketTimeoutMS": 45000,
+        }
         if username:
             client_kwargs["username"] = username
         if password:

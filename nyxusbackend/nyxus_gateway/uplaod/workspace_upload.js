@@ -13,6 +13,13 @@ const STORAGE_ROOT = path.resolve(
 const upload = express.Router();
 const mongostore = getMongoStore();
 
+try{
+    mongostore.ping()
+}
+catch(err){
+    console.err('[MongoDB] mongodb connection error',err)
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function getArchivePayload(req) {

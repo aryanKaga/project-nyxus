@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timezone
 import hashlib
 import logging
 import os
@@ -194,6 +195,60 @@ def serialize_pod(pod: client.V1Pod) -> dict[str, Any]:
     }
 
 
+def _delete_pod_safely(pod_name: str) -> None:
+    try:
+        core.delete_namespaced_pod(
+            name=pod_name,
+            namespace=NAMESPACE,
+            propagation_policy="Background",
+            grace_period_seconds=0,
+        )
+        logger.info("Deleted pod %s", pod_name)
+    except ApiException as exc:
+        if exc.status != 404:
+            logger.warning("Failed to delete pod %s: %s", pod_name, exc)
+
+
+def check_container_fatal_state(pod: client.V1Pod) -> str | None:
+    """Detect unrecoverable container startup failures early without waiting for timeout."""
+    statuses = (pod.status.container_statuses or []) if pod.status else []
+    for s in statuses:
+        if s.state:
+            if s.state.waiting and s.state.waiting.reason in (
+                "CrashLoopBackOff",
+                "ImagePullBackOff",
+                "ErrImagePull",
+                "CreateContainerConfigError",
+                "InvalidImageName",
+            ):
+                return f"{s.state.waiting.reason}: {s.state.waiting.message or 'container failed to start'}"
+            if s.state.terminated and s.state.terminated.exit_code != 0:
+                msg = s.state.terminated.message or s.state.terminated.reason or "unknown"
+                return f"Container {s.name} terminated with exit code {s.state.terminated.exit_code} ({msg})"
+    return None
+
+
+def probe_pod_readiness(pod_ip: str) -> tuple[int, dict[str, Any] | None]:
+    """Perform a direct check against the pod's /ready endpoint."""
+    try:
+        with httpx.Client(timeout=1.0) as client_http:
+            resp = client_http.get(f"http://{pod_ip}:{AGENT_PORT}/ready")
+            try:
+                data = resp.json()
+            except Exception:
+                data = {"raw": resp.text}
+            return resp.status_code, data
+    except Exception:
+        return 0, None
+
+
+def pod_age_seconds(pod: client.V1Pod) -> float:
+    if pod.metadata and pod.metadata.creation_timestamp:
+        now = datetime.now(timezone.utc)
+        return (now - pod.metadata.creation_timestamp).total_seconds()
+    return 0.0
+
+
 def find_usable_pod(runtime_id: str) -> client.V1Pod | None:
     pods = core.list_namespaced_pod(
         namespace=NAMESPACE, label_selector=f"app=nyxus-agent,runtime-id={runtime_id}"
@@ -202,13 +257,29 @@ def find_usable_pod(runtime_id: str) -> client.V1Pod | None:
     for p in pods:
         if is_terminating(p):
             continue
-        if is_active(p):
-            live.append(p)
-        else:
-            try:
-                core.delete_namespaced_pod(name=p.metadata.name, namespace=NAMESPACE)
-            except ApiException:
-                pass
+        if not is_active(p):
+            _delete_pod_safely(p.metadata.name)
+            continue
+
+        # If pod has fatal container state (CrashLoop, etc.), clean it up
+        if check_container_fatal_state(p):
+            logger.warning("Cleaning up pod %s with fatal container error", p.metadata.name)
+            _delete_pod_safely(p.metadata.name)
+            continue
+
+        # If pod is older than READY_TIMEOUT and is STILL not ready, it is a stuck zombie pod
+        if not pod_is_ready(p) and pod_age_seconds(p) > READY_TIMEOUT:
+            logger.warning(
+                "Cleaning up stale unready pod %s (age %.1fs > %ss)",
+                p.metadata.name,
+                pod_age_seconds(p),
+                READY_TIMEOUT,
+            )
+            _delete_pod_safely(p.metadata.name)
+            continue
+
+        live.append(p)
+
     live.sort(key=lambda p: p.metadata.creation_timestamp, reverse=True)
     return live[0] if live else None
 
@@ -300,17 +371,54 @@ def create_pod(ref: WorkspaceRef, runtime_id: str) -> None:
 
 def wait_until_ready(runtime_id: str) -> client.V1Pod:
     deadline = time.monotonic() + READY_TIMEOUT
+    last_pod = None
     while time.monotonic() < deadline:
         pod = find_usable_pod(runtime_id)
-        if pod and pod_is_ready(pod) and pod.status.pod_ip:
+        if not pod:
+            break
+        last_pod = pod
+        if pod_is_ready(pod) and pod.status.pod_ip:
             return pod
+
+        # 1. Fast fail on container crash / image pull failure
+        fatal_msg = check_container_fatal_state(pod)
+        if fatal_msg:
+            _delete_pod_safely(pod.metadata.name)
+            raise HTTPException(502, f"Agent Pod container failed: {fatal_msg}")
+
+        # 2. If pod has an IP and is running, query /ready for fast failure (e.g. Workspace not found)
+        if pod.status and pod.status.pod_ip:
+            status_code, resp_data = probe_pod_readiness(pod.status.pod_ip)
+            if status_code == 404:
+                err_detail = (resp_data or {}).get("error") or "Workspace not found in MongoDB."
+                _delete_pod_safely(pod.metadata.name)
+                raise HTTPException(404, f"Workspace not found: {err_detail}")
+            elif status_code == 500 and resp_data and "NOT_FOUND" in str(resp_data.get("error", "")):
+                _delete_pod_safely(pod.metadata.name)
+                raise HTTPException(404, f"Workspace not found: {resp_data.get('error')}")
+
         time.sleep(1)
+
+    # If we timed out, clean up the stuck pod so next request won't inherit it
+    if last_pod:
+        logger.warning(
+            "Agent Pod %s did not become ready within %ss; deleting stuck pod.",
+            last_pod.metadata.name,
+            READY_TIMEOUT,
+        )
+        _delete_pod_safely(last_pod.metadata.name)
+
     raise HTTPException(504, f"Agent Pod did not become ready within {READY_TIMEOUT}s.")
 
 
 def ensure_runtime(ref: WorkspaceRef, force_resume: bool = False) -> tuple[client.V1Pod, bool, dict | None]:
     runtime_id = runtime_id_for(ref.user_id, ref.workspace_id)
     with key_lock(runtime_id):
+        if force_resume:
+            existing = find_usable_pod(runtime_id)
+            if existing:
+                _delete_pod_safely(existing.metadata.name)
+
         created = False
         if find_usable_pod(runtime_id) is None:
             with CREATE_LOCK:

@@ -32,7 +32,7 @@ limits:
   max_tool_calls_per_task: 60
   max_read_file_calls: 15
   command_timeout_seconds: 120  # first call on a big repo may build the index
-  max_steps: 192                # LangGraph recursion_limit for one task
+  max_steps: 15              # LangGraph recursion_limit for one task
 
 shell:
   enabled: true

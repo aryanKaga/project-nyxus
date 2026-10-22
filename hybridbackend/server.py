@@ -264,20 +264,42 @@ def _activate_workspace(sid, workspace_id, api_key):
 
 
 async def _init_container_workspace():
-    """Startup task: download and initialize workspace for the dedicated container."""
+    """Startup task: download and initialize workspace for the dedicated container with retries."""
     global _container_ready, _container_init_error
-    try:
-        logger.info(
-            "Container startup: downloading workspace %s from MongoDB (dedicated session: %s)...",
-            CONTAINER_WORKSPACE_ID,
-            RUNTIME_SESSION_ID,
-        )
-        await asyncio.to_thread(init_dedicated_session, CONTAINER_WORKSPACE_ID, CONTAINER_USER_ID)
-        _container_ready = True
-        logger.info("Dedicated session %s ready for workspace %s.", RUNTIME_SESSION_ID, CONTAINER_WORKSPACE_ID)
-    except Exception as exc:
-        _container_init_error = str(exc)
-        logger.exception("Failed to initialize workspace for container")
+    max_retries = int(os.getenv("WORKSPACE_INIT_RETRIES", "5"))
+    retry_delay = 2.0
+    for attempt in range(1, max_retries + 1):
+        try:
+            logger.info(
+                "Container startup (attempt %d/%d): downloading workspace %s from MongoDB (dedicated session: %s)...",
+                attempt,
+                max_retries,
+                CONTAINER_WORKSPACE_ID,
+                RUNTIME_SESSION_ID,
+            )
+            await asyncio.to_thread(init_dedicated_session, CONTAINER_WORKSPACE_ID, CONTAINER_USER_ID)
+            _container_ready = True
+            _container_init_error = None
+            logger.info("Dedicated session %s ready for workspace %s.", RUNTIME_SESSION_ID, CONTAINER_WORKSPACE_ID)
+            return
+        except LookupError as exc:
+            _container_init_error = f"NOT_FOUND: {exc}"
+            logger.error("Workspace %s not found in MongoDB: %s", CONTAINER_WORKSPACE_ID, exc)
+            break
+        except Exception as exc:
+            logger.warning(
+                "Container workspace init attempt %d/%d failed: %s",
+                attempt,
+                max_retries,
+                exc,
+                exc_info=True,
+            )
+            if attempt < max_retries:
+                await asyncio.sleep(retry_delay)
+                retry_delay = min(retry_delay * 1.5, 10.0)
+            else:
+                _container_init_error = str(exc)
+                logger.exception("All attempts to initialize workspace for container failed")
 
 
 @asynccontextmanager
@@ -301,8 +323,17 @@ app.add_middleware(
 
 @app.get("/health")
 @app.get("/live")
-async def health_check():
+async def health_check(response: Response):
     """Kubernetes liveness probe endpoint."""
+    if _container_init_error and not _container_init_error.startswith("NOT_FOUND"):
+        # Transient or connection failure exhausted retries; restart the container
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        return {
+            "status": "error",
+            "mode": "dedicated_container",
+            "session_id": RUNTIME_SESSION_ID,
+            "error": _container_init_error,
+        }
     return {
         "status": "ok",
         "mode": "dedicated_container",
@@ -316,6 +347,14 @@ async def readiness_check(response: Response):
     """Kubernetes readiness probe endpoint."""
     if CONTAINER_WORKSPACE_ID and not _container_ready:
         if _container_init_error:
+            if _container_init_error.startswith("NOT_FOUND"):
+                response.status_code = status.HTTP_404_NOT_FOUND
+                return {
+                    "status": "not_found",
+                    "session_id": RUNTIME_SESSION_ID,
+                    "workspace_id": CONTAINER_WORKSPACE_ID,
+                    "error": _container_init_error,
+                }
             response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             return {
                 "status": "error",
