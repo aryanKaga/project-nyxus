@@ -49,8 +49,8 @@ class MongoStore:
         "connecting to the nyxus database"
         self.database = self.client[database_name]
         self.workspaces = self.database["workspaces"]
-        self.conversations = self.database["conversations"]  
-
+        self.conversations = self.database["conversations"]
+        self.observations = self.database["observations"]
 
         self.archive_bucket = GridFSBucket(self.database, bucket_name="workspace_archives")
 
@@ -156,6 +156,80 @@ class MongoStore:
                 {"role": "assistant", "content": turn["answer"]},
             ))
         return history
+
+    def save_observation(
+        self,
+        api_key,
+        workspace_id,
+        observation,
+        task_id=None,
+        thread_id=None,
+        step=None,
+    ):
+        self.ping()
+        uid = api_key
+        try:
+            uid = user_key(api_key)
+        except Exception:
+            pass
+
+        doc = {
+            "user_id": uid,
+            "workspace_id": workspace_id,
+            "created_at": datetime.now(timezone.utc),
+        }
+        if task_id:
+            doc["task_id"] = task_id
+        if thread_id:
+            doc["thread_id"] = thread_id
+
+        if isinstance(observation, dict):
+            doc["observation"] = dict(observation)
+            if step is None and "step" in observation:
+                step = observation["step"]
+            if "node" in observation:
+                doc["node"] = observation["node"]
+            if "action" in observation:
+                doc["action"] = observation["action"]
+            if "status" in observation:
+                doc["status"] = observation["status"]
+            if "name" in observation:
+                doc["name"] = observation["name"]
+        else:
+            doc["observation"] = observation
+
+        if step is not None:
+            doc["step"] = step
+
+        insert_result = self.observations.insert_one(dict(doc))
+        doc["_id"] = str(insert_result.inserted_id)
+        return doc
+
+    def get_observations(
+        self,
+        api_key=None,
+        workspace_id=None,
+        task_id=None,
+        thread_id=None,
+    ):
+        self.ping()
+        query = {}
+        if api_key:
+            try:
+                query["user_id"] = user_key(api_key)
+            except Exception:
+                query["user_id"] = api_key
+        if workspace_id:
+            query["workspace_id"] = workspace_id
+        if task_id:
+            query["task_id"] = task_id
+        if thread_id:
+            query["thread_id"] = thread_id
+        return list(
+            self.observations.find(query, {"_id": 0}).sort(
+                [("created_at", 1), ("_id", 1)]
+            )
+        )
 
 
 _store = None

@@ -94,7 +94,11 @@ function activate(context) {
             });
         }
     };
-    const sidebar = vscode.window.registerWebviewViewProvider('nyxusReplica.sidebar', viewProvider);
+    const sidebar = vscode.window.registerWebviewViewProvider('nyxusReplica.sidebar', viewProvider, {
+        webviewOptions: {
+            retainContextWhenHidden: true
+        }
+    });
 
     const cleanup = {
         dispose() {
@@ -115,7 +119,13 @@ function activate(context) {
         sidebarProvider?.sendMessage({ type: 'set_view', view: 'settings' });
     });
 
-    context.subscriptions.push(output, sayHi, setApiKey, openNativeSettings, sidebar, openSidebar, openSettings, cleanup);
+    const clearChat = vscode.commands.registerCommand('nyxusReplica.clearChat', async () => {
+        await context.workspaceState.update('nyxus.chatMessages', []);
+        sidebarProvider?.sendMessage({ type: 'clear_conversation' });
+        void vscode.window.showInformationMessage('Nyxus conversation cleared.');
+    });
+
+    context.subscriptions.push(output, sayHi, setApiKey, openNativeSettings, sidebar, openSidebar, openSettings, clearChat, cleanup);
     if (configurationListener) context.subscriptions.push(configurationListener);
 }
 

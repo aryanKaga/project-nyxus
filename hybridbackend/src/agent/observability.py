@@ -74,12 +74,22 @@ class AgentTracer(BaseCallbackHandler):
         hide_inputs_outputs: bool = False,
         max_entries: int = 200,
         trace_path: Path | None = None,
+        mongo_store: Any | None = None,
+        workspace_id: str | None = None,
+        api_key: str | None = None,
+        thread_id: str | None = None,
+        task_id: str | None = None,
     ):
         super().__init__()
         self.on_event = on_event
         self.hide_inputs_outputs = hide_inputs_outputs
         self.max_entries = max_entries
         self.trace_path = trace_path
+        self.mongo_store = mongo_store
+        self.workspace_id = workspace_id
+        self.api_key = api_key
+        self.thread_id = thread_id
+        self.task_id = task_id
         self.trace: list[dict[str, Any]] = []
         self._trace_lock = threading.Lock()
         self._llm_starts: dict[str, float] = {}
@@ -130,6 +140,8 @@ class AgentTracer(BaseCallbackHandler):
             self.trace.append(entry)
             if self.trace_path:
                 self._persist_trace()
+            if self.mongo_store:
+                self._persist_to_mongo(entry)
 
         if self.on_event:
             try:
@@ -137,6 +149,21 @@ class AgentTracer(BaseCallbackHandler):
             except Exception:
                 logger.exception("Local tracing callback failed.")
         return entry
+
+    def _persist_to_mongo(self, entry: dict[str, Any]) -> None:
+        """Persist an observation entry to MongoDB."""
+        try:
+            if hasattr(self.mongo_store, "save_observation"):
+                self.mongo_store.save_observation(
+                    api_key=self.api_key or "default",
+                    workspace_id=self.workspace_id or "default",
+                    observation=entry,
+                    task_id=self.task_id,
+                    thread_id=self.thread_id,
+                    step=entry.get("step"),
+                )
+        except Exception:
+            logger.exception("Could not persist observation to MongoDB.")
 
     def _persist_trace(self) -> None:
         """Atomically persist this bounded trace snapshot on the local machine."""
@@ -302,8 +329,11 @@ def setup_observability(
     skill="auto",
     extra_tags=None,
     on_event=None,
+    mongo_store=None,
+    api_key=None,
+    task_id=None,
 ):
-    """Return the invocation config for tracing backends (Langfuse, LangSmith, and AgentTracer)."""
+    """Return the invocation config for tracing backends (Langfuse, LangSmith, AgentTracer/MongoDB)."""
     global _warned_duplicate_traces
     settings = config.get("observability", {})
     langfuse_enabled = settings.get("langfuse", {}).get("enabled", False)
@@ -311,6 +341,14 @@ def setup_observability(
     hide_io = settings.get("hide_inputs_outputs", False)
     local_trace_cfg = settings.get("local_trace", {})
     local_trace_enabled = local_trace_cfg.get("enabled", False)
+    mongo_cfg = settings.get("mongodb", {})
+    mongo_enabled = mongo_cfg.get("enabled", False)
+    if mongo_store is None and mongo_enabled:
+        try:
+            from database.mongo_store import get_mongo_store
+            mongo_store = get_mongo_store()
+        except Exception:
+            mongo_store = None
 
     callbacks = []
 
@@ -323,8 +361,13 @@ def setup_observability(
             if local_trace_enabled
             else None
         ),
+        mongo_store=mongo_store,
+        workspace_id=repo_id,
+        api_key=api_key,
+        thread_id=thread_id,
+        task_id=task_id,
     )
-    if local_trace_enabled or on_event:
+    if local_trace_enabled or mongo_store is not None or on_event:
         callbacks.append(tracer)
 
     if langsmith_enabled:
@@ -401,12 +444,17 @@ def setup_observability(
         "thread_id": thread_id,
         "codegraph_version": config.get("codegraph", {}).get("version", "PIN-ME"),
     }
-    return {
+    result = {
         "callbacks": callbacks,
         "tags": tags,
         "metadata": metadata,
         "tracer": tracer,
     }
+    if mongo_store is not None:
+        result["mongo_store"] = mongo_store
+        result["api_key"] = api_key
+        result["task_id"] = task_id
+    return result
 
 
 def _local_trace_path(local_trace_cfg, thread_id):

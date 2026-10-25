@@ -500,3 +500,48 @@ def test_container_chat_auto_resolves_container_workspace(monkeypatch):
     assert len(scheduled) == 1
     assert scheduled[0][4] == "container-ws-123"
     client.disconnect()
+
+
+def test_run_agent_chat_persists_observations_to_mongodb_after_each_step(monkeypatch):
+    saved_observations = []
+
+    class MockStoreWithObservations(FakeStore):
+        def save_observation(self, **kwargs):
+            saved_observations.append(kwargs)
+
+    store = MockStoreWithObservations()
+    monkeypatch.setattr(server, "get_mongo_store", lambda: store)
+
+    session = server.WorkspaceSession(
+        workspace_id="test-workspace",
+        thread_id="test-workspace:test-user",
+        graph=SimpleNamespace(agent_config={"observability": {}}),
+    )
+    monkeypatch.setattr(server, "_get_workspace_session", lambda sid, api_key: session)
+    monkeypatch.setattr(
+        observability,
+        "setup_observability",
+        lambda *args, **kwargs: {"callbacks": []},
+    )
+    monkeypatch.setattr(server.socketio, "start_background_task", lambda *args: None)
+
+    # When run_task executes, simulate calling on_step with observations
+    def fake_run_task(*args, **kwargs):
+        on_step = kwargs.get("on_step")
+        if on_step:
+            on_step([{"step": 1, "node": "assistant", "action": "decided_tools"}], {})
+            on_step([{"step": 2, "node": "tools", "action": "tool_call:search", "output": "found files"}], {})
+        return {"messages": [], "execution_trace": []}
+
+    monkeypatch.setattr(agent_loop, "run_task", fake_run_task)
+    monkeypatch.setattr(agent_loop, "final_answer", lambda state: "Test answer")
+    monkeypatch.setattr(server.socketio, "emit", lambda *args, **kwargs: None)
+
+    server._run_agent_chat("sid-1", "Test question", "user-api-key")
+
+    assert len(saved_observations) == 2
+    assert saved_observations[0]["workspace_id"] == "test-workspace"
+    assert saved_observations[0]["observation"]["action"] == "decided_tools"
+    assert saved_observations[1]["observation"]["action"] == "tool_call:search"
+    assert saved_observations[1]["observation"]["output"] == "found files"
+

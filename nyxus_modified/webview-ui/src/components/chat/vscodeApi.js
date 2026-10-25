@@ -1,7 +1,15 @@
 function createMockApi() {
+  let state = null;
   return {
     postMessage(message) {
       console.log("[Mock VSCode] postMessage:", message?.type);
+    },
+    getState() {
+      return state;
+    },
+    setState(newState) {
+      state = newState;
+      return state;
     },
   };
 }

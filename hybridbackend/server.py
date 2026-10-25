@@ -433,20 +433,46 @@ def _run_agent_chat(
                 except Exception:
                     pass
 
+            store = None
+            try:
+                store = get_mongo_store()
+            except Exception:
+                pass
+
+            task_id = str(uuid.uuid4())
+
+            def on_agent_loop_step(new_entries, current_state):
+                if store and hasattr(store, "save_observation"):
+                    for entry in new_entries:
+                        try:
+                            store.save_observation(
+                                api_key=api_key,
+                                workspace_id=session.workspace_id,
+                                observation=entry,
+                                task_id=task_id,
+                                thread_id=session.thread_id,
+                            )
+                        except Exception:
+                            logger.warning("Could not persist observation to MongoDB after agent loop")
+
             tracing = setup_observability(
                 session.graph.agent_config,
                 session.workspace_id,
                 session.thread_id,
                 on_event=on_trace_event,
+                mongo_store=store,
+                api_key=api_key,
+                task_id=task_id,
             )
             state = run_task(
                 session.graph,
                 prompt,
                 session.thread_id,
-                task_id=str(uuid.uuid4()),
+                task_id=task_id,
                 callbacks_config=tracing,
                 history=session.history if session.history_pending else None,
                 timeout_seconds=CHAT_TIMEOUT_SECONDS,
+                on_step=on_agent_loop_step,
             )
             answer = final_answer(state)
             trace = state.get("execution_trace", []) or (

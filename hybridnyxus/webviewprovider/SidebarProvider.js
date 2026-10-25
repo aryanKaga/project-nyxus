@@ -14,6 +14,7 @@ class SidebarProvider {
      * @param {import('vscode').OutputChannel} output
      */
     constructor(context, output) {
+        this.context = context;
         this.extensionUri = context.extensionUri;
         this.output = output;
         /** @type {import('vscode').WebviewView | undefined} */
@@ -216,6 +217,27 @@ class SidebarProvider {
                         : 'Cannot reach Nyxus. Check the server URL and connection.'
                 });
                 this.sendMessage({ type: 'workspace_sync_status', ...this.workspaceStatus });
+
+                const cachedMessages = this.context?.workspaceState?.get('nyxus.chatMessages');
+                if (Array.isArray(cachedMessages) && cachedMessages.length > 0) {
+                    this.sendMessage({
+                        type: 'restore_conversation',
+                        messages: cachedMessages
+                    });
+                }
+                return;
+            }
+
+            if (message.type === 'save_conversation') {
+                if (Array.isArray(message.messages)) {
+                    void this.context?.workspaceState?.update('nyxus.chatMessages', message.messages);
+                }
+                return;
+            }
+
+            if (message.type === 'clear_conversation') {
+                void this.context?.workspaceState?.update('nyxus.chatMessages', []);
+                this.sendMessage({ type: 'clear_conversation' });
                 return;
             }
 

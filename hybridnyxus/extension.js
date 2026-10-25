@@ -19,7 +19,7 @@ function activate(context) {
          */
         resolveWebviewView(webviewView) {
             const webview = webviewView.webview;
-          
+            webview.options = { enableScripts: false };
             webview.html = '<!DOCTYPE html><html><body><p>Starting Nyxus…</p></body></html>';
 
             initializationTimer = setTimeout(() => {
@@ -45,7 +45,11 @@ function activate(context) {
             });
         }
     };
-    const sidebar = vscode.window.registerWebviewViewProvider('nyxusReplica.sidebar', viewProvider);
+    const sidebar = vscode.window.registerWebviewViewProvider('nyxusReplica.sidebar', viewProvider, {
+        webviewOptions: {
+            retainContextWhenHidden: true
+        }
+    });
     const cleanup = {
         dispose() {
             if (initializationTimer !== undefined) {
@@ -58,8 +62,13 @@ function activate(context) {
     const openSidebar = vscode.commands.registerCommand('nyxusReplica.openSidebar', () =>
         vscode.commands.executeCommand('workbench.view.extension.nyxusReplica')
     );
+    const clearChat = vscode.commands.registerCommand('nyxusReplica.clearChat', async () => {
+        await context.workspaceState.update('nyxus.chatMessages', []);
+        sidebarProvider?.sendMessage({ type: 'clear_conversation' });
+        void vscode.window.showInformationMessage('Nyxus conversation cleared.');
+    });
 
-    context.subscriptions.push(output, sayHi, sidebar, openSidebar, cleanup);
+    context.subscriptions.push(output, sayHi, sidebar, openSidebar, clearChat, cleanup);
 }
 
 function deactivate() {}

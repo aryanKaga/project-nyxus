@@ -13,6 +13,7 @@ def test_both_backends_off_adds_no_callbacks(monkeypatch):
     config["observability"]["langfuse"]["enabled"] = False
     config["observability"]["langsmith"]["enabled"] = False
     config["observability"]["local_trace"] = {"enabled": False}
+    config["observability"]["mongodb"] = {"enabled": False}
     monkeypatch.delenv("LANGSMITH_API_KEY", raising=False)
     monkeypatch.delenv("LANGSMITH_PROJECT", raising=False)
 
@@ -232,3 +233,29 @@ def test_langfuse_validation(monkeypatch):
     monkeypatch.delenv("LANGFUSE_SECRET_KEY", raising=False)
     with pytest.raises(RuntimeError, match="LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY are not set"):
         setup_observability(config, "repo", "thread")
+
+
+def test_mongodb_tracer_saves_observations():
+    saved_observations = []
+
+    class MockMongoStore:
+        def save_observation(self, **kwargs):
+            saved_observations.append(kwargs)
+
+    tracer = AgentTracer(
+        mongo_store=MockMongoStore(),
+        workspace_id="test-ws",
+        api_key="test-key",
+        thread_id="test-thread",
+        task_id="test-task",
+    )
+    tracer.on_tool_start({"name": "search"}, '{"query": "auth"}', run_id="tool-1")
+    tracer.on_tool_end("Found auth matches", run_id="tool-1")
+
+    assert len(saved_observations) == 2
+    assert saved_observations[0]["workspace_id"] == "test-ws"
+    assert saved_observations[0]["observation"]["action"] == "tool_start"
+    assert saved_observations[0]["observation"]["name"] == "search"
+    assert saved_observations[1]["observation"]["action"] == "tool_end"
+    assert saved_observations[1]["observation"]["output"] == "Found auth matches"
+

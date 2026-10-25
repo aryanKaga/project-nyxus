@@ -228,3 +228,42 @@ def test_agent_loop_records_execution_trace():
     assert "tool_call:repo_orient" in actions
     assert "final_answer" in actions
 
+
+def test_agent_loop_streams_observations_after_each_step():
+    runtime, skills = _runtime()
+    model = FakeModel([
+        call("repo_orient", {"budget": "small"}, "orient-1"),
+        AIMessage(content="Final answer about repo."),
+    ])
+    graph = build_graph(
+        agent_dir=resolve_agent_dir(),
+        root=resolve_agent_dir(),
+        model=model,
+        digest_model=FakeDigest(),
+        runtime=runtime,
+        skills=skills,
+    )
+
+    saved_steps = []
+
+    def on_step_callback(new_entries, state):
+        saved_steps.append([e["action"] for e in new_entries])
+
+    state = run_task(
+        graph,
+        "What does this repo do?",
+        "stream-step-thread",
+        on_step=on_step_callback,
+    )
+
+    # We should have received callback calls after each loop step
+    assert len(saved_steps) >= 3
+    # First assistant step
+    assert "decided_tools" in saved_steps[0]
+    # Tools step (observation)
+    assert "tool_call:repo_orient" in saved_steps[1]
+    # Final answer assistant step
+    flat_actions = [a for sub in saved_steps for a in sub]
+    assert "final_answer" in flat_actions
+
+

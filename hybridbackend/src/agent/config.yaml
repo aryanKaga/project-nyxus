@@ -67,8 +67,11 @@ observability:
     enabled: false
     endpoint: http://127.0.0.1:1984
     project: nyxus-local
-  local_trace:
+  mongodb:
     enabled: true
+    collection: observations
+  local_trace:
+    enabled: false
     max_entries: 200
     directory: .nyxus/traces
   hide_inputs_outputs: false
