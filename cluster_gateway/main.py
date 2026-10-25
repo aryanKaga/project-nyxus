@@ -37,6 +37,7 @@ KUBE_CONTEXT = (os.getenv("KUBE_CONTEXT") or "").strip('\'" ') or None
 AGENT_SECRET_NAME = (os.getenv("AGENT_SECRET_NAME") or "").strip('\'" ') or None
 READY_TIMEOUT = float(os.getenv("READY_TIMEOUT") or "90")
 RESUME_TIMEOUT = float(os.getenv("RESUME_TIMEOUT") or "30")
+IDLE_TIMEOUT_SECONDS = float(os.getenv("IDLE_TIMEOUT_SECONDS") or "1200")  # 20 minutes idle timeout
 
 GATEWAY_HOST = os.getenv("GATEWAY_HOST", "0.0.0.0")
 GATEWAY_PORT = int(os.getenv("GATEWAY_PORT", "5000"))
@@ -63,6 +64,13 @@ runtime_clients: dict[str, set[str]] = {}
 # runtime_id -> socketio.AsyncClient
 upstream_agents: dict[str, socketio.AsyncClient] = {}
 _upstream_locks: dict[str, asyncio.Lock] = {}
+# runtime_id -> epoch timestamp of last active interaction
+runtime_last_active: dict[str, float] = {}
+
+
+def touch_runtime_activity(runtime_id: str) -> None:
+    if runtime_id:
+        runtime_last_active[runtime_id] = time.time()
 
 # -------------------- Metrics --------------------
 AGENT_REQUESTS = Counter(
@@ -426,6 +434,7 @@ def ensure_runtime(ref: WorkspaceRef, force_resume: bool = False) -> tuple[clien
             created = True
 
         pod = wait_until_ready(runtime_id)
+        touch_runtime_activity(runtime_id)
         return pod, created, None
 
 
@@ -498,6 +507,7 @@ async def gateway_disconnect(sid, *args):
             runtime_clients[runtime_id].discard(sid)
             if not runtime_clients[runtime_id]:
                 runtime_clients.pop(runtime_id, None)
+            touch_runtime_activity(runtime_id)
 
 
 @sio.on("workspace_resume")
@@ -515,6 +525,7 @@ async def gateway_workspace_resume(sid, data):
 
     ref = WorkspaceRef(user_id=user_id, workspace_id=workspace_id, api_key=api_key)
     runtime_id = runtime_id_for(ref.user_id, ref.workspace_id)
+    touch_runtime_activity(runtime_id)
 
     # Register client mapping
     client_sessions[sid] = {
@@ -576,6 +587,7 @@ async def gateway_chat(sid, data):
     if not runtime_id:
         return {"ok": False, "error": "Workspace is not resumed yet. Emit workspace_resume first."}
 
+    touch_runtime_activity(runtime_id)
     try:
         pod = find_usable_pod(runtime_id)
         if not pod or not pod_is_ready(pod):
@@ -608,6 +620,7 @@ async def gateway_workspace_archive(sid, data):
 
     ref = WorkspaceRef(user_id=user_id, workspace_id=workspace_id, api_key=api_key)
     runtime_id = runtime_id_for(ref.user_id, ref.workspace_id)
+    touch_runtime_activity(runtime_id)
 
     client_sessions[sid] = {
         "runtime_id": runtime_id,
@@ -757,9 +770,73 @@ async def delete_runtime(runtime_id: str) -> dict[str, str]:
         agent_sio = upstream_agents.pop(runtime_id, None)
         if agent_sio and agent_sio.connected:
             await agent_sio.disconnect()
+        runtime_last_active.pop(runtime_id, None)
         RESUMED.pop(runtime_id, None)
 
     return {"runtime_id": runtime_id, "status": "deletion_requested"}
+
+
+# -------------------- Idle Pod Reaper --------------------
+async def idle_pod_reaper_loop() -> None:
+    """Periodically monitors agent pods and deletes any pod idle for >= IDLE_TIMEOUT_SECONDS."""
+    logger.info(
+        "Idle pod reaper initialized (timeout: %.0fs / %.1fm)",
+        IDLE_TIMEOUT_SECONDS,
+        IDLE_TIMEOUT_SECONDS / 60,
+    )
+    while True:
+        try:
+            await asyncio.sleep(60)
+            now = time.time()
+            pods = await asyncio.to_thread(runtime_pods)
+            for pod in pods:
+                if is_terminating(pod):
+                    continue
+                labels = pod.metadata.labels or {}
+                runtime_id = labels.get("runtime-id")
+                if not runtime_id:
+                    continue
+
+                # If there are active client WebSocket connections to this runtime, update activity and skip
+                if runtime_clients.get(runtime_id):
+                    touch_runtime_activity(runtime_id)
+                    continue
+
+                last_active = runtime_last_active.get(runtime_id)
+                if last_active is None:
+                    # Fallback to pod creation timestamp or now
+                    if pod.metadata and pod.metadata.creation_timestamp:
+                        last_active = pod.metadata.creation_timestamp.timestamp()
+                    else:
+                        last_active = now
+                    runtime_last_active[runtime_id] = last_active
+
+                idle_duration = now - last_active
+                if idle_duration >= IDLE_TIMEOUT_SECONDS:
+                    logger.info(
+                        "Idle reaper: pod %s (runtime %s) idle for %.0fs (>= %ss); deleting pod.",
+                        pod.metadata.name,
+                        runtime_id,
+                        idle_duration,
+                        IDLE_TIMEOUT_SECONDS,
+                    )
+                    with key_lock(runtime_id):
+                        await asyncio.to_thread(_delete_pod_safely, pod.metadata.name)
+                        agent_sio = upstream_agents.pop(runtime_id, None)
+                        if agent_sio and agent_sio.connected:
+                            try:
+                                await agent_sio.disconnect()
+                            except Exception:
+                                pass
+                        runtime_last_active.pop(runtime_id, None)
+                        RESUMED.pop(runtime_id, None)
+        except Exception:
+            logger.exception("Unexpected error in idle_pod_reaper_loop")
+
+
+@app.on_event("startup")
+async def on_gateway_startup():
+    asyncio.create_task(idle_pod_reaper_loop())
 
 
 # -------------------- ASGI App Mount --------------------
