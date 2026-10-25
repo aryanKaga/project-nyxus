@@ -47,7 +47,7 @@ def _is_rate_limit_error(error):
             continue
         for attribute in ("status_code", "code"):
             value = getattr(source, attribute, None)
-            if value == 429 or str(value).strip() == "429":
+            if value in (429, 503) or str(value).strip() in ("429", "503"):
                 return True
 
     message = str(error).lower()
@@ -57,9 +57,12 @@ def _is_rate_limit_error(error):
         "resource_exhausted",
         "too many requests",
         "quota exceeded",
+        "503",
+        "unavailable",
+        "high demand",
     ))
 
-
+#make delays to retry on hitting the rate limit error
 def _generate_with_rate_limit_retry(adapter, **kwargs):
     retries = 0
     while True:
@@ -83,7 +86,7 @@ def _generate_with_rate_limit_retry(adapter, **kwargs):
             check_deadline()
             retries += 1
 
-
+#kind of a plugin between the gemini and my messages, converts the messages into ai message that the gemini can read
 class ProviderChatModel(BaseChatModel):
     """LangChain chat interface backed by the project's Gemini provider."""
 
@@ -239,7 +242,7 @@ def _append_traces(existing, new_entries):
         result.extend(new_entries)
     return result
 
-
+#this is the main state that the agent will run
 class AgentState(TypedDict, total=False):
     messages: Annotated[list[AnyMessage], add_messages]
     summary: str
@@ -258,7 +261,7 @@ class AgentState(TypedDict, total=False):
 def _load_config(agent_dir):
     return yaml.safe_load((agent_dir / "config.yaml").read_text())
 
-
+#return the provider chat model for the same
 def _make_model(spec):
     provider = spec["provider"]
     if provider != "gemini":

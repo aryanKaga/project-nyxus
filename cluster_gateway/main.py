@@ -338,7 +338,7 @@ def create_pod(ref: WorkspaceRef, runtime_id: str) -> None:
                     env=env,
                     env_from=env_from if env_from else None,
                     resources=client.V1ResourceRequirements(
-                        requests={"cpu": "250m", "memory": "512Mi"},
+                        requests={"cpu": "50m", "memory": "128Mi"},
                         limits={"cpu": "2000m", "memory": "4Gi"},
                     ),
                     liveness_probe=client.V1Probe(
