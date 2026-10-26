@@ -129,6 +129,8 @@ Review `config.yaml` before running:
   cannot be sent to LangSmith Cloud from this setup.
 * `observability.langfuse.enabled` is a separate opt-in switch and is off by
   default.
+* `observability.mongodb.enabled` persists observation and execution traces
+  directly to MongoDB under the `observations` collection after each agent loop.
 * `observability.local_trace.enabled` keeps a bounded JSON trace locally under
   `hybridbackend/.nyxus/traces/` by default; change `directory` to relocate it.
   Each file is restricted to the current user and atomically updated. Set

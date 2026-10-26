@@ -5,15 +5,41 @@ import MarkdownMessage from "./MarkdownMessage";
 function WelcomeMessage() {
   return (
     <div className="nyxus-welcome">
-      <div className="nyxus-welcome-icon">
-        <NyxusIcon size={56} />
+      <div className="nyxus-welcome-badge">
+        <span className="nyxus-welcome-ping-dot" />
+        <span className="nyxus-welcome-badge-text">NYXUS RUNTIME 2.0</span>
+        <span className="nyxus-welcome-badge-sep">|</span>
+        <span className="nyxus-welcome-badge-sub">Deep-Context Cloud Pair Programmer</span>
       </div>
-      <div className="nyxus-welcome-text">
-        Hello! I am Nyxus.
-        <br />
-        How can I help you today?
+
+      <div className="nyxus-welcome-hero-box">
+        <div className="nyxus-welcome-icon-wrap">
+          <NyxusIcon size={40} />
+        </div>
+        <h1 className="nyxus-welcome-title">
+          Autonomous Coding Intelligence.
+          <br />
+          <span className="nyxus-welcome-title-accent">Connected to your Editor.</span>
+        </h1>
+        <p className="nyxus-welcome-desc">
+          Isolates repository context into ephemeral Kubernetes agent pods, orchestrating multi-agent LangGraph workflows and streaming markdown solutions directly into VS Code.
+        </p>
       </div>
-      <div className="nyxus-welcome-sub">// ready to assist</div>
+
+      <div className="nyxus-welcome-stats-grid">
+        <div className="nyxus-stat-card">
+          <span className="nyxus-stat-value">&lt; 15s</span>
+          <span className="nyxus-stat-label">POD COLD START</span>
+        </div>
+        <div className="nyxus-stat-card">
+          <span className="nyxus-stat-value">0 ms</span>
+          <span className="nyxus-stat-label">LOCAL CPU OVERHEAD</span>
+        </div>
+        <div className="nyxus-stat-card">
+          <span className="nyxus-stat-value">100%</span>
+          <span className="nyxus-stat-label">GIT DELTA SYNC</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -24,7 +50,7 @@ function ChatMessage({ message, onOpenAnswer, isLatest }) {
   return (
     <article className={`nyxus-msg ${message.role}`}>
       <div className="nyxus-msg-avatar">
-        {isAssistant ? <NyxusIcon size={14} /> : "U"}
+        {isAssistant ? <NyxusIcon size={16} /> : <span className="nyxus-user-prompt">&gt;_</span>}
       </div>
       <div className={`nyxus-msg-bubble${isReadme ? " has-envelope" : ""}`}>
         {isReadme ? (
@@ -54,6 +80,30 @@ function ChatMessage({ message, onOpenAnswer, isLatest }) {
   );
 }
 
+function PodStartupLoader() {
+  return (
+    <article className="nyxus-msg assistant">
+      <div className="nyxus-msg-avatar"><NyxusIcon size={16} /></div>
+      <div className="nyxus-pod-loader-bubble">
+        <div className="nyxus-pod-loader-badge">
+          <span className="nyxus-pod-dot-ping" />
+          <span>K8S RUNTIME PROVISIONING</span>
+        </div>
+        <div className="nyxus-pod-loader-header">
+          <div className="nyxus-spinner" />
+          <span className="nyxus-pod-loader-title">Starting agent pod...</span>
+        </div>
+        <div className="nyxus-pod-loader-sub">
+          Isolating repository context into ephemeral Kubernetes container (&lt; 15s)
+        </div>
+        <div className="nyxus-pod-progress-track">
+          <div className="nyxus-pod-progress-bar" />
+        </div>
+      </div>
+    </article>
+  );
+}
+
 function StreamingMessage({ text, isReadme }) {
   return (
     <article className="nyxus-msg assistant">
@@ -77,12 +127,13 @@ function StreamingMessage({ text, isReadme }) {
 export default function MessageList({
   isStreaming,
   isReadmeStreaming,
+  isWaitingForServer,
   messages,
   messagesEndRef,
   onOpenAnswer,
   streamingText,
 }) {
-  const showWelcome = messages.length === 0 && !isStreaming;
+  const showWelcome = messages.length === 0 && !isStreaming && !isWaitingForServer;
   const lastIndex = messages.length - 1;
 
   return (
@@ -96,6 +147,7 @@ export default function MessageList({
           isLatest={index === lastIndex}
         />
       ))}
+      {isWaitingForServer && !isStreaming && <PodStartupLoader />}
       {isStreaming && <StreamingMessage text={streamingText} isReadme={isReadmeStreaming} />}
       <div ref={messagesEndRef} />
     </section>

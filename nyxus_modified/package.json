@@ -1,22 +1,31 @@
 {
   "name": "nyxus-coding-agent-replica",
-  "displayName": "Nyxus Modified",
-  "description": "Nyxus Modified - Coding Agent",
-  "version": "0.0.1",
-  "publisher": "your-name",
+  "displayName": "Nyxus",
+  "description": "Repository intelligence for VS Code — trace data flows, map architecture, and generate diagrams across your entire codebase using a fast cloud AI harness.",
+  "version": "0.0.9",
+  "publisher": "aryanKaga",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aryanKaga/project-nyxus"
+  },
   "main": "./extension.js",
   "engines": {
-    "vscode": "^1.120.0"
+    "vscode": "^1.85.0"
   },
   "categories": [
     "Other"
   ],
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#030303",
+    "theme": "dark"
+  },
   "contributes": {
     "viewsContainers": {
       "activitybar": [
         {
           "id": "nyxusReplica",
-          "title": "Nyxus Modified",
+          "title": "Nyxus",
           "icon": "media/icon.svg"
         }
       ]
@@ -38,7 +47,7 @@
       },
       {
         "command": "nyxusReplica.openSidebar",
-        "title": "Open Nyxus Modified Sidebar"
+        "title": "Open Nyxus Sidebar"
       },
       {
         "command": "nyxusReplica.openSettings",
@@ -58,7 +67,7 @@
       "properties": {
         "nyxusReplica.url": {
           "type": "string",
-          "default": "http://localhost:80",
+          "default": "http://54.79.152.236",
           "scope": "machine",
           "description": "Base URL of the Nyxus server used for chat, workspace uploads, and workspace ID requests."
         },
@@ -68,13 +77,27 @@
           "scope": "machine",
           "description": "User ID sent with Nyxus workspace requests."
         },
+        "nyxusReplica.apiKey": {
+          "type": "string",
+          "default": "abc@123",
+          "scope": "machine",
+          "description": "API Key used to authenticate Nyxus requests."
+        },
         "nyxusReplica.requestTimeout": {
           "type": "number",
-          "default": 15000,
+          "default": 30000,
           "minimum": 1000,
-          "maximum": 120000,
+          "maximum": 600000,
           "scope": "application",
           "description": "Maximum time in milliseconds to wait for a Nyxus server acknowledgement."
+        },
+        "nyxusReplica.uploadTimeout": {
+          "type": "number",
+          "default": 300000,
+          "minimum": 10000,
+          "maximum": 600000,
+          "scope": "application",
+          "description": "Maximum time in milliseconds to wait for Git workspace transfer, unpacking, and database saving (default: 300,000ms / 5 minutes)."
         },
         "nyxusReplica.enableWorkspaceSync": {
           "type": "boolean",
@@ -124,7 +147,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "@types/vscode": "^1.120.0",
+    "@types/vscode": "^1.85.0",
     "vsce": "^1.97.0"
   },
   "directories": {

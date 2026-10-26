@@ -25,6 +25,12 @@ __pycache__/
 .pytest_cache/
 .codegraph/
 
+# Server unpacked storage and archives
+storage/
+**/storage/
+.upload-*/
+**/.upload-*/
+
 # Local secrets and logs
 .env
 .env.*
@@ -80,7 +86,16 @@ async function ensureGitIgnore(gitRoot) {
 }
 
 async function stageAndCommit(gitRoot) {
-    await execFileAsync('git', ['-C', gitRoot, 'add', '--all'], { maxBuffer: MAX_GIT_OUTPUT_BYTES });
+    await execFileAsync('git', [
+        '-C',
+        gitRoot,
+        'add',
+        '--all',
+        ':!**/storage/**',
+        ':!**/storage',
+        ':!.upload-*/**',
+        ':!.upload-*'
+    ], { maxBuffer: MAX_GIT_OUTPUT_BYTES });
 
     try {
         await execFileAsync('git', ['-C', gitRoot, 'diff', '--cached', '--quiet']);
@@ -104,7 +119,16 @@ async function stageAndCommit(gitRoot) {
 
 async function stageWorkspace(workspaceRoot) {
     const gitRoot = await resolveGitRoot(workspaceRoot);
-    await execFileAsync('git', ['-C', gitRoot, 'add', '--all'], { maxBuffer: MAX_GIT_OUTPUT_BYTES });
+    await execFileAsync('git', [
+        '-C',
+        gitRoot,
+        'add',
+        '--all',
+        ':!**/storage/**',
+        ':!**/storage',
+        ':!.upload-*/**',
+        ':!.upload-*'
+    ], { maxBuffer: MAX_GIT_OUTPUT_BYTES });
 }
 
 async function unstageWorkspace(workspaceRoot) {
@@ -122,7 +146,11 @@ async function listGitFiles(gitRoot, subPath = '') {
         args,
         { encoding: 'buffer', maxBuffer: 256 * 1024 * 1024 }
     );
-    return stdout.toString('utf8').split('\0').filter(Boolean);
+    return stdout.toString('utf8').split('\0').filter(file => {
+        if (!file) return false;
+        if (file.includes('storage/') || file.includes('.upload-')) return false;
+        return true;
+    });
 }
 
 async function create_workspace_archive(workspaceRoot) {

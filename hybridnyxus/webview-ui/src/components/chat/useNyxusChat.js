@@ -5,7 +5,17 @@ const STREAM_STALL_TIMEOUT_MS = 30000;
 const vscode = getVsCodeApi();
 
 export function useNyxusChat() {
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState(() => {
+    try {
+      const state = typeof vscode.getState === "function" ? vscode.getState() : null;
+      if (state && Array.isArray(state.messages)) {
+        return state.messages;
+      }
+    } catch {
+      // ignore
+    }
+    return [];
+  });
   const [streamingText, setStreamingText] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState("connecting");
@@ -108,6 +118,27 @@ export function useNyxusChat() {
           isStreamingRef.current = false;
           setIsStreaming(false);
           break;
+        case "restore_conversation":
+          if (Array.isArray(message.messages) && message.messages.length > 0) {
+            setMessages((current) => {
+              if (current.length === 0) {
+                return message.messages;
+              }
+              return current;
+            });
+          }
+          break;
+        case "clear_conversation":
+          setMessages([]);
+          try {
+            const prevState = typeof vscode.getState === "function" ? (vscode.getState() || {}) : {};
+            if (typeof vscode.setState === "function") {
+              vscode.setState({ ...prevState, messages: [] });
+            }
+          } catch {
+            // ignore
+          }
+          break;
         default:
           break;
       }
@@ -120,6 +151,20 @@ export function useNyxusChat() {
       clearStallTimer();
     };
   }, [armStallTimer, clearStallTimer, finishStream]);
+
+  useEffect(() => {
+    try {
+      const prevState = typeof vscode.getState === "function" ? (vscode.getState() || {}) : {};
+      if (typeof vscode.setState === "function") {
+        vscode.setState({ ...prevState, messages });
+      }
+    } catch {
+      // ignore
+    }
+    if (typeof vscode.postMessage === "function") {
+      vscode.postMessage({ type: "save_conversation", messages });
+    }
+  }, [messages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

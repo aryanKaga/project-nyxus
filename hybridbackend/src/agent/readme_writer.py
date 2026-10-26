@@ -10,6 +10,8 @@ lists, tables, code blocks, and Mermaid diagrams only when they improve clarity.
 When generating Mermaid diagrams, ensure valid syntax by always enclosing node
 labels that contain parentheses, brackets, colons, or special characters in double
 quotes (e.g., node_id["Label (detail)"]).
+Never place quotation marks around edge/arrow labels inside pipes (e.g., use A -->|label text| B, NEVER A -->| "label text" | B).
+Never use the raw ampersand '&' symbol inside Mermaid diagrams (it is a reserved operator); write 'and' instead.
 Return only the finished Markdown, without an outer code fence or commentary."""
 
 
@@ -42,13 +44,34 @@ def _extract_content(response):
     return ""
 
 
+import re
+
+
+def sanitize_mermaid(text: str) -> str:
+    """Sanitize Mermaid code blocks to ensure syntax compliance."""
+    if not isinstance(text, str) or "```mermaid" not in text:
+        return text
+
+    def clean_block(match):
+        code = match.group(1)
+        # 1. Strip quotes inside edge pipes: | "something" | -> |something|
+        code = re.sub(r'(\|)\s*["\']\s*(.*?)\s*["\']\s*(\|)', r'\1\2\3', code)
+        # 2. Replace & inside edge pipes with "and"
+        def replace_amp(m):
+            return m.group(1) + m.group(2).replace("&", "and") + m.group(3)
+        code = re.sub(r'(\|)([^|\n]*?)(\|)', replace_amp, code)
+        return f"```mermaid{code}```"
+
+    return re.sub(r'```mermaid([\s\S]*?)```', clean_block, text)
+
+
 def write_readme_answer(model, question, answer):
     """Invoke the README writer and return the full formatted answer."""
     response = model.invoke(_build_messages(question, answer))
     markdown = _extract_content(response)
     if not markdown:
         raise ValueError("The README writer returned an empty Markdown answer.")
-    return markdown
+    return sanitize_mermaid(markdown)
 
 
 def stream_readme_answer(model, question, answer, on_chunk=None):
@@ -76,4 +99,4 @@ def stream_readme_answer(model, question, answer, on_chunk=None):
     markdown = "".join(chunks).strip()
     if not markdown:
         raise ValueError("The README writer returned an empty Markdown answer.")
-    return markdown
+    return sanitize_mermaid(markdown)

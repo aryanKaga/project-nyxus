@@ -1,6 +1,7 @@
 const vscode = require('vscode');
 
-const UPLOAD_TIMEOUT_MS = 120000;
+const UPLOAD_TIMEOUT_MS = 300000; // 5 minutes default
+const MAX_UPLOAD_TIMEOUT_MS = 600000; // 10 minutes max clamp
 
 /**
  * @param {(event: string) => void} logFlow
@@ -33,8 +34,13 @@ async function send_workspace_data(logFlow, workspaceData, context) {
 
     logFlow('request.workspace_archive');
 
+    const configuredTimeout = config.get('uploadTimeout') || config.get('requestTimeout');
+    const timeoutMs = Math.min(
+        configuredTimeout && configuredTimeout >= 60000 ? configuredTimeout : UPLOAD_TIMEOUT_MS,
+        MAX_UPLOAD_TIMEOUT_MS
+    );
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), Math.min(config.get('requestTimeout', UPLOAD_TIMEOUT_MS), UPLOAD_TIMEOUT_MS));
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     let response;
     let rawBody;

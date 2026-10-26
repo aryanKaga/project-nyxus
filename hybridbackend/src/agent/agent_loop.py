@@ -40,14 +40,14 @@ RATE_LIMIT_RETRY_DELAY_SECONDS = 35
 MAX_RATE_LIMIT_RETRIES = 3
 logger = logging.getLogger(__name__)
 
-
+#checks the late limit error
 def _is_rate_limit_error(error):
     for source in (error, getattr(error, "response", None)):
         if source is None:
             continue
         for attribute in ("status_code", "code"):
             value = getattr(source, attribute, None)
-            if value == 429 or str(value).strip() == "429":
+            if value in (429, 503) or str(value).strip() in ("429", "503"):
                 return True
 
     message = str(error).lower()
@@ -57,9 +57,12 @@ def _is_rate_limit_error(error):
         "resource_exhausted",
         "too many requests",
         "quota exceeded",
+        "503",
+        "unavailable",
+        "high demand",
     ))
 
-
+#make delays to retry on hitting the rate limit error
 def _generate_with_rate_limit_retry(adapter, **kwargs):
     retries = 0
     while True:
@@ -83,7 +86,7 @@ def _generate_with_rate_limit_retry(adapter, **kwargs):
             check_deadline()
             retries += 1
 
-
+#kind of a plugin between the gemini and my messages, converts the messages into ai message that the gemini can read
 class ProviderChatModel(BaseChatModel):
     """LangChain chat interface backed by the project's Gemini provider."""
 
@@ -239,7 +242,7 @@ def _append_traces(existing, new_entries):
         result.extend(new_entries)
     return result
 
-
+#this is the main state that the agent will run
 class AgentState(TypedDict, total=False):
     messages: Annotated[list[AnyMessage], add_messages]
     summary: str
@@ -258,7 +261,7 @@ class AgentState(TypedDict, total=False):
 def _load_config(agent_dir):
     return yaml.safe_load((agent_dir / "config.yaml").read_text())
 
-
+#return the provider chat model for the same
 def _make_model(spec):
     provider = spec["provider"]
     if provider != "gemini":
@@ -594,6 +597,7 @@ def run_task(
     callbacks_config=None,
     history=None,
     timeout_seconds=None,
+    on_step=None,
 ):
     task_id = task_id or str(uuid.uuid4())
     initial_messages = []
@@ -607,18 +611,55 @@ def run_task(
         "recursion_limit": graph.agent_config["limits"]["max_steps"],
         **(callbacks_config or {}),
     }
+
+    if on_step is None and callbacks_config and callbacks_config.get("mongo_store"):
+        store = callbacks_config["mongo_store"]
+        meta = callbacks_config.get("metadata", {})
+        repo_id = meta.get("repo_id")
+        user_id = callbacks_config.get("api_key")
+
+        def _default_mongo_on_step(new_entries, _current_state):
+            if hasattr(store, "save_observation"):
+                for entry in new_entries:
+                    try:
+                        store.save_observation(
+                            api_key=user_id,
+                            workspace_id=repo_id,
+                            observation=entry,
+                            task_id=task_id,
+                            thread_id=thread_id,
+                            step=entry.get("step") if isinstance(entry, dict) else None,
+                        )
+                    except Exception:
+                        logger.warning("Could not persist observation to MongoDB.")
+
+        on_step = _default_mongo_on_step
+
     with task_deadline(timeout_seconds):
         try:
-            state = graph.invoke(
-                {
-                    "messages": [
-                        *initial_messages,
-                        HumanMessage(content=question),
-                    ],
-                    "task_id": task_id,
-                },
+            initial_state = {
+                "messages": [
+                    *initial_messages,
+                    HumanMessage(content=question),
+                ],
+                "task_id": task_id,
+            }
+            state = initial_state
+            last_trace_len = 0
+            for chunk in graph.stream(
+                initial_state,
                 config=config,
-            )
+                stream_mode="values",
+            ):
+                state = chunk
+                current_trace = state.get("execution_trace", [])
+                if on_step and len(current_trace) > last_trace_len:
+                    new_entries = current_trace[last_trace_len:]
+                    last_trace_len = len(current_trace)
+                    try:
+                        on_step(new_entries, state)
+                    except Exception as exc:
+                        logger.warning("on_step callback error in agent loop: %s", exc)
         except GraphRecursionError:
             snapshot = graph.get_state(config)
             state = dict(snapshot.values)

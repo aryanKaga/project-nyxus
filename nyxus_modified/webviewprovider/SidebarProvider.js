@@ -611,6 +611,27 @@ class SidebarProvider {
                         : 'Cannot reach Nyxus. Check the server URL and connection.'
                 });
                 this.sendMessage({ type: 'workspace_sync_status', ...this.workspaceStatus });
+
+                const cachedMessages = this.context?.workspaceState?.get('nyxus.chatMessages');
+                if (Array.isArray(cachedMessages) && cachedMessages.length > 0) {
+                    this.sendMessage({
+                        type: 'restore_conversation',
+                        messages: cachedMessages
+                    });
+                }
+                return;
+            }
+
+            if (message.type === 'save_conversation') {
+                if (Array.isArray(message.messages)) {
+                    void this.context?.workspaceState?.update('nyxus.chatMessages', message.messages);
+                }
+                return;
+            }
+
+            if (message.type === 'clear_conversation') {
+                void this.context?.workspaceState?.update('nyxus.chatMessages', []);
+                this.sendMessage({ type: 'clear_conversation' });
                 return;
             }
 
@@ -957,7 +978,7 @@ class SidebarProvider {
         return `<!DOCTYPE html>
 <html>
 <body style="font-family: sans-serif; padding: 12px; color: var(--vscode-foreground); background: var(--vscode-editor-background);">
-    <h3>Nyxus Modified could not load its chat UI</h3>
+    <h3>Nyxus could not load its chat UI</h3>
     <pre style="white-space: pre-wrap; font-size: 12px;">${message}</pre>
     <p>Run <code>npm run build</code> in the extension folder, then reload the window.</p>
 </body>

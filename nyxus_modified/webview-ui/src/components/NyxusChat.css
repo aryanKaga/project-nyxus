@@ -1,693 +1,1096 @@
 html, body, #root {
-          margin: 0;
-          padding: 0;
-          width: 100%;
-          height: 100%;
-          overflow: hidden;
-        }
-
-        * {
-          box-sizing: border-box;
-        }
-
-        :root {
-          --nyxus-bg: #0d0d12;
-          --nyxus-surface: #13131a;
-          --nyxus-surface-2: #1a1a24;
-          --nyxus-border: rgba(255,255,255,0.07);
-          --nyxus-accent: #7c6af7;
-          --nyxus-accent-dim: rgba(124,106,247,0.15);
-          --nyxus-text: #e8e6f0;
-          --nyxus-text-muted: rgba(232,230,240,0.55);
-          --nyxus-green: #00ff88;
-          --nyxus-radius: 12px;
-        }
-
-        @keyframes nyxusBounce {
-          0%, 80%, 100% {
-            transform: scale(0.6);
-            opacity: 0.4;
-          }
-          40% {
-            transform: scale(1);
-            opacity: 1;
-          }
-        }
-
-        @keyframes nyxusPulse {
-          0%, 100% { opacity: 0.5; }
-          50% { opacity: 1; }
-        }
-
-        .nyxus-root {
-          display: flex;
-          flex-direction: column;
-          width: 100%;
-          height: 100vh;
-          background: var(--nyxus-bg);
-          color: var(--nyxus-text);
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        }
-
-        .nyxus-header {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 14px 16px;
-          border-bottom: 1px solid var(--nyxus-border);
-          background: var(--nyxus-surface);
-        }
-
-        .nyxus-header-title {
-          font-size: 15px;
-          font-weight: 700;
-        }
-
-        .nyxus-status-dot {
-          width: 7px;
-          height: 7px;
-          border-radius: 50%;
-          margin-left: auto;
-          background: var(--nyxus-green);
-          animation: nyxusPulse 2s infinite;
-          box-shadow: 0 0 6px var(--nyxus-green);
-        }
-
-        .nyxus-status-dot.disconnected,
-        .nyxus-status-dot.error {
-          background: #ff6b6b;
-          box-shadow: 0 0 6px rgba(255,107,107,0.7);
-        }
-
-        .nyxus-status-dot.connecting {
-          background: #f0b44d;
-          box-shadow: 0 0 6px rgba(240,180,77,0.7);
-        }
-
-        .nyxus-status-label {
-          color: var(--nyxus-text-muted);
-          font-size: 11px;
-          text-transform: capitalize;
-        }
-
-        .nyxus-header-btn {
-          background: transparent;
-          border: none;
-          color: var(--nyxus-text-muted);
-          cursor: pointer;
-          padding: 4px;
-          border-radius: 6px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: all 0.15s ease;
-          margin-left: 6px;
-        }
-
-        .nyxus-header-btn:hover {
-          background: rgba(255, 255, 255, 0.08);
-          color: var(--nyxus-text);
-        }
-
-        .nyxus-flow {
-          max-height: 130px;
-          overflow: auto;
-          border-bottom: 1px solid var(--nyxus-border);
-          color: var(--nyxus-text-muted);
-          font-size: 11px;
-        }
-
-        .nyxus-flow summary {
-          cursor: pointer;
-          padding: 7px 16px;
-        }
-
-        .nyxus-flow ol {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-          margin: 0;
-          padding: 0 16px 8px 32px;
-        }
-
-        .nyxus-flow li {
-          display: flex;
-          gap: 8px;
-          min-width: 0;
-        }
-
-        .nyxus-flow time {
-          flex: 0 0 auto;
-        }
-
-        .nyxus-flow code {
-          overflow-wrap: anywhere;
-          color: var(--nyxus-text);
-        }
-
-        .nyxus-status {
-          display: flex;
-          flex-direction: column;
-          gap: 3px;
-          padding: 8px 16px;
-          border-bottom: 1px solid var(--nyxus-border);
-        }
-
-        .nyxus-status-message {
-          margin: 0;
-          overflow-wrap: anywhere;
-          font-size: 11px;
-          line-height: 1.45;
-        }
-
-        .nyxus-status-message.is-connection {
-          color: #ffb4a9;
-        }
-
-        .nyxus-status-message.is-workspace {
-          color: var(--nyxus-text-muted);
-        }
-
-        .nyxus-messages {
-          flex: 1;
-          overflow-y: auto;
-          padding: 20px 16px;
-          display: flex;
-          flex-direction: column;
-          gap: 14px;
-        }
-
-        .nyxus-welcome {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          flex: 1;
-          gap: 12px;
-          text-align: center;
-        }
-
-        .nyxus-welcome-text {
-          font-size: 16px;
-          font-weight: 600;
-          line-height: 1.5;
-        }
-
-        .nyxus-welcome-sub {
-          font-size: 12px;
-          color: var(--nyxus-text-muted);
-          font-family: Consolas, "Courier New", monospace;
-        }
-
-        .nyxus-msg {
-          display: flex;
-          gap: 10px;
-        }
-
-        .nyxus-msg.user {
-          flex-direction: row-reverse;
-        }
-
-        .nyxus-msg-avatar {
-          width: 28px;
-          height: 28px;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-          margin-top: 2px;
-        }
-
-        .nyxus-msg.assistant .nyxus-msg-avatar {
-          background: var(--nyxus-accent-dim);
-          color: var(--nyxus-accent);
-        }
-
-        .nyxus-msg.user .nyxus-msg-avatar {
-          background: rgba(255,255,255,0.06);
-          color: var(--nyxus-text-muted);
-          font-size: 11px;
-          font-weight: 700;
-        }
-
-        .nyxus-msg-bubble,
-        .nyxus-streaming-bubble {
-          padding: 10px 14px;
-          border-radius: var(--nyxus-radius);
-          max-width: 85%;
-          white-space: pre-wrap;
-          word-break: break-word;
-          font-family: Consolas, "Courier New", monospace;
-          font-size: 13px;
-          line-height: 1.6;
-        }
-
-        .nyxus-msg.user .nyxus-msg-bubble {
-          background: rgba(124,106,247,0.12);
-          border: 1px solid rgba(124,106,247,0.3);
-        }
-
-        .nyxus-msg.assistant .nyxus-msg-bubble,
-        .nyxus-streaming-bubble {
-          background: var(--nyxus-surface-2);
-          border: 1px solid var(--nyxus-border);
-        }
-
-        .nyxus-msg-bubble.has-envelope {
-          background: transparent;
-          border: none;
-          padding: 0;
-          max-width: 96%;
-          width: 100%;
-        }
-
-        .nyxus-envelope-container {
-          width: 100%;
-          border-radius: var(--nyxus-radius);
-          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-
-        .nyxus-envelope-card {
-          background: linear-gradient(145deg, var(--nyxus-surface-2) 0%, rgba(26, 26, 38, 0.95) 100%);
-          border: 1px solid var(--nyxus-border);
-          border-radius: var(--nyxus-radius);
-          overflow: hidden;
-          cursor: pointer;
-          user-select: none;
-          transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
-        }
-
-        .nyxus-envelope-card:hover {
-          border-color: rgba(124, 106, 247, 0.6);
-          box-shadow: 0 4px 16px rgba(124, 106, 247, 0.12);
-        }
-
-        .nyxus-envelope-container.is-open .nyxus-envelope-card {
-          border-radius: var(--nyxus-radius) var(--nyxus-radius) 0 0;
-          border-bottom: 1px dashed rgba(124, 106, 247, 0.4);
-        }
-
-        .nyxus-envelope-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 10px 14px;
-          gap: 12px;
-          flex-wrap: wrap;
-        }
-
-        .nyxus-envelope-title-group {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-
-        .nyxus-envelope-icon-wrap {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 32px;
-          height: 32px;
-          border-radius: 8px;
-          background: var(--nyxus-accent-dim);
-          color: var(--nyxus-accent);
-          flex-shrink: 0;
-        }
-
-        .nyxus-envelope-meta {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-
-        .nyxus-envelope-filename {
-          font-weight: 700;
-          font-size: 13px;
-          color: var(--nyxus-text);
-          font-family: Consolas, "Courier New", monospace;
-        }
-
-        .nyxus-envelope-badge {
-          font-size: 10px;
-          font-weight: 700;
-          letter-spacing: 0.5px;
-          padding: 2px 6px;
-          border-radius: 4px;
-          background: rgba(124, 106, 247, 0.2);
-          color: var(--nyxus-accent);
-          border: 1px solid rgba(124, 106, 247, 0.4);
-        }
-
-        .nyxus-envelope-actions {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-
-        .nyxus-envelope-action-btn {
-          background: rgba(255, 255, 255, 0.06);
-          border: 1px solid var(--nyxus-border);
-          border-radius: 6px;
-          color: var(--nyxus-text-muted);
-          font-size: 11px;
-          padding: 4px 8px;
-          cursor: pointer;
-          font-family: inherit;
-          transition: all 0.15s;
-        }
-
-        .nyxus-envelope-action-btn:hover {
-          background: var(--nyxus-accent-dim);
-          border-color: var(--nyxus-accent);
-          color: var(--nyxus-accent);
-        }
-
-        .nyxus-envelope-action-btn.primary {
-          background: var(--nyxus-accent);
-          color: #ffffff;
-          font-weight: 600;
-          border-color: var(--nyxus-accent);
-          box-shadow: 0 0 10px rgba(124, 106, 247, 0.35);
-        }
-
-        .nyxus-envelope-action-btn.primary:hover {
-          background: #8e7dfa;
-          color: #ffffff;
-          box-shadow: 0 0 14px rgba(124, 106, 247, 0.55);
-        }
-
-        .nyxus-envelope-toggle-btn {
-          background: transparent;
-          border: none;
-          color: var(--nyxus-text-muted);
-          font-size: 11px;
-          cursor: pointer;
-          padding: 4px 6px;
-          font-family: inherit;
-          transition: color 0.15s;
-        }
-
-        .nyxus-envelope-toggle-btn:hover {
-          color: var(--nyxus-accent);
-        }
-
-        .nyxus-envelope-toggle-hint {
-          font-size: 11px;
-          color: var(--nyxus-accent);
-          font-weight: 600;
-        }
-
-        .nyxus-envelope-flap-preview {
-          padding: 10px 14px 14px;
-          border-top: 1px dashed rgba(255, 255, 255, 0.08);
-          background: rgba(0, 0, 0, 0.15);
-        }
-
-        .nyxus-envelope-seal {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 12px;
-          font-weight: 600;
-          color: var(--nyxus-text);
-          margin-bottom: 4px;
-        }
-
-        .nyxus-envelope-seal-icon {
-          color: var(--nyxus-accent);
-        }
-
-        .nyxus-envelope-hint-text {
-          font-size: 11px;
-          color: var(--nyxus-text-muted);
-          margin: 0;
-          line-height: 1.4;
-        }
-
-        .nyxus-envelope-letter {
-          background: var(--nyxus-surface-2);
-          border: 1px solid var(--nyxus-border);
-          border-top: none;
-          border-radius: 0 0 var(--nyxus-radius) var(--nyxus-radius);
-          padding: 14px 16px;
-          animation: nyxusEnvelopeUnfold 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-          transform-origin: top center;
-        }
-
-        @keyframes nyxusEnvelopeUnfold {
-          0% {
-            opacity: 0;
-            transform: translateY(-8px) scaleY(0.96);
-          }
-          60% {
-            opacity: 0.85;
-            transform: translateY(1px) scaleY(1.01);
-          }
-          100% {
-            opacity: 1;
-            transform: translateY(0) scaleY(1);
-          }
-        }
-
-        .nyxus-envelope-letter-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 12px;
-          padding-bottom: 8px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-        }
-
-        .nyxus-envelope-letter-tag {
-          font-size: 11px;
-          color: var(--nyxus-text-muted);
-          font-family: Consolas, "Courier New", monospace;
-        }
-
-        .nyxus-view-answer-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-          margin-top: 8px;
-          background: rgba(255, 255, 255, 0.06);
-          border: 1px solid var(--nyxus-border);
-          border-radius: 6px;
-          color: var(--nyxus-text-muted);
-          font-size: 11px;
-          padding: 4px 8px;
-          cursor: pointer;
-          font-family: inherit;
-          transition: all 0.15s;
-        }
-
-        .nyxus-view-answer-btn:hover {
-          background: var(--nyxus-accent-dim);
-          border-color: var(--nyxus-accent);
-          color: var(--nyxus-accent);
-        }
-
-        .nyxus-mermaid-block {
-          margin: 14px 0;
-          padding: 12px;
-          border-radius: 8px;
-          background: rgba(0, 0, 0, 0.35);
-          border: 1px solid var(--nyxus-border);
-          overflow-x: auto;
-          display: flex;
-          justify-content: center;
-        }
-
-        .nyxus-mermaid-block svg {
-          max-width: 100%;
-          height: auto;
-        }
-
-        .nyxus-mermaid-block.loading {
-          padding: 16px;
-          color: var(--nyxus-text-muted);
-          font-size: 12px;
-        }
-
-        .nyxus-mermaid-block.error {
-          border-color: rgba(248, 81, 73, 0.4);
-          background: rgba(248, 81, 73, 0.05);
-          flex-direction: column;
-          align-items: stretch;
-        }
-
-        .nyxus-mermaid-header {
-          font-size: 11px;
-          color: rgba(248, 81, 73, 0.8);
-          margin-bottom: 6px;
-          font-weight: 600;
-        }
-
-        .nyxus-markdown table {
-          width: 100%;
-          border-collapse: collapse;
-          margin: 12px 0;
-          font-size: 12px;
-          overflow-x: auto;
-          display: block;
-        }
-
-        .nyxus-markdown th,
-        .nyxus-markdown td {
-          border: 1px solid var(--nyxus-border);
-          padding: 6px 10px;
-          text-align: left;
-        }
-
-        .nyxus-markdown th {
-          background: rgba(124, 106, 247, 0.12);
-          color: var(--nyxus-text);
-          font-weight: 600;
-        }
-
-        .nyxus-markdown tr:nth-child(even) {
-          background: rgba(255, 255, 255, 0.02);
-        }
-
-        .nyxus-markdown pre {
-          background: rgba(0, 0, 0, 0.35);
-          border: 1px solid var(--nyxus-border);
-          border-radius: 6px;
-          padding: 10px 12px;
-          overflow-x: auto;
-          margin: 10px 0;
-        }
-
-        .nyxus-markdown code {
-          font-family: Consolas, "Courier New", monospace;
-          font-size: 12px;
-        }
-
-        .nyxus-markdown blockquote {
-          border-left: 3px solid var(--nyxus-accent);
-          margin: 10px 0;
-          padding: 4px 12px;
-          color: var(--nyxus-text-muted);
-          background: rgba(124, 106, 247, 0.05);
-          border-radius: 0 4px 4px 0;
-        }
-
-        .nyxus-markdown h1,
-        .nyxus-markdown h2,
-        .nyxus-markdown h3 {
-          margin: 14px 0 8px;
-          color: var(--nyxus-text);
-          font-weight: 600;
-        }
-
-        .nyxus-markdown ul,
-        .nyxus-markdown ol {
-          padding-left: 20px;
-          margin: 8px 0;
-        }
-
-        .nyxus-cursor {
-          display: inline-block;
-          width: 2px;
-          height: 1em;
-          background: var(--nyxus-accent);
-          margin-left: 2px;
-          animation: nyxusPulse 0.8s infinite;
-        }
-
-        .nyxus-input-area {
-          padding: 12px 16px 16px;
-          border-top: 1px solid var(--nyxus-border);
-          background: var(--nyxus-surface);
-        }
-
-        .nyxus-readme-toggle {
-          margin-bottom: 8px;
-          padding: 6px 10px;
-          border: 1px solid var(--nyxus-border);
-          border-radius: 8px;
-          background: var(--nyxus-surface-2);
-          color: var(--nyxus-text-muted);
-          cursor: pointer;
-          font-size: 11px;
-          font-weight: 600;
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          transition: all 0.2s;
-        }
-
-        .nyxus-readme-toggle:hover {
-          border-color: rgba(124, 106, 247, 0.4);
-          color: var(--nyxus-text);
-        }
-
-        .nyxus-readme-toggle.active {
-          color: #ffffff;
-          border-color: var(--nyxus-accent);
-          background: var(--nyxus-accent-dim);
-          box-shadow: 0 0 8px rgba(124, 106, 247, 0.25);
-        }
-
-        .nyxus-input-wrapper {
-          display: flex;
-          align-items: flex-end;
-          gap: 8px;
-          background: var(--nyxus-surface-2);
-          border: 1px solid var(--nyxus-border);
-          border-radius: var(--nyxus-radius);
-          padding: 6px 6px 6px 12px;
-        }
-
-        .nyxus-textarea {
-          flex: 1;
-          border: none;
-          outline: none;
-          resize: none;
-          background: transparent;
-          color: var(--nyxus-text);
-          font-family: Consolas, "Courier New", monospace;
-          font-size: 13px;
-          min-height: 36px;
-          max-height: 120px;
-          line-height: 1.6;
-        }
-
-        .nyxus-textarea::placeholder {
-          color: var(--nyxus-text-muted);
-        }
-
-        .nyxus-send-btn {
-          width: 34px;
-          height: 34px;
-          border: none;
-          border-radius: 8px;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: var(--nyxus-accent);
-          color: white;
-        }
-
-        .nyxus-send-btn:disabled {
-          opacity: 0.35;
-          cursor: not-allowed;
-        }
-
-        .nyxus-streaming-bubble.is-readme {
-          background: linear-gradient(145deg, var(--nyxus-surface-2) 0%, rgba(26, 26, 38, 0.95) 100%);
-          border: 1px solid rgba(124, 106, 247, 0.3);
-          max-width: 96%;
-          width: 100%;
-        }
-
-        .nyxus-streaming-readme {
-          position: relative;
-        }
-
-        .nyxus-streaming-readme .nyxus-cursor {
-          position: absolute;
-          bottom: 0;
-          right: 0;
-        }
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #030303;
+  color: #ededed;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  --nyxus-bg: #030303;
+  --nyxus-surface: #0a0a0d;
+  --nyxus-surface-2: #121216;
+  --nyxus-surface-3: #18181c;
+  --nyxus-border: rgba(255, 255, 255, 0.08);
+  --nyxus-border-subtle: rgba(255, 255, 255, 0.04);
+  --nyxus-border-hover: rgba(255, 255, 255, 0.22);
+  --nyxus-accent: #ffffff;
+  --nyxus-accent-dim: rgba(255, 255, 255, 0.08);
+  --nyxus-text: #ededed;
+  --nyxus-text-muted: #a1a1aa;
+  --nyxus-text-subtle: #71717a;
+  --nyxus-green: #10b981;
+  --nyxus-green-glow: rgba(16, 185, 129, 0.35);
+  --nyxus-radius: 12px;
+  --nyxus-radius-sm: 8px;
+  --nyxus-radius-xs: 6px;
+  --nyxus-font-sans: 'Geist', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --nyxus-font-mono: 'Geist Mono', 'JetBrains Mono', Consolas, "Courier New", monospace;
+}
+
+/* Custom monochrome scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: #060608;
+}
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+
+@keyframes nyxusBounce {
+  0%, 80%, 100% {
+    transform: scale(0.6);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes nyxusPulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+@keyframes nyxusSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes nyxusFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.nyxus-root {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100vh;
+  background-color: var(--nyxus-bg);
+  color: var(--nyxus-text);
+  font-family: var(--nyxus-font-sans);
+  position: relative;
+}
+
+/* Header */
+.nyxus-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--nyxus-border);
+  background: rgba(10, 10, 13, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  z-index: 10;
+  gap: 10px;
+}
+
+.nyxus-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.nyxus-header-logo-box {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  flex-shrink: 0;
+}
+
+.nyxus-header-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.nyxus-header-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nyxus-header-title {
+  font-family: var(--nyxus-font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #ffffff;
+}
+
+.nyxus-header-badge {
+  font-family: var(--nyxus-font-mono);
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #d4d4d8;
+  line-height: 1.2;
+}
+
+.nyxus-header-sub {
+  font-size: 10px;
+  color: var(--nyxus-text-subtle);
+  letter-spacing: -0.01em;
+}
+
+.nyxus-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.nyxus-header-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  font-family: var(--nyxus-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  color: #34d399;
+}
+
+.nyxus-header-status-pill.is-disconnected {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.22);
+  color: #f87171;
+}
+
+.nyxus-status-pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+  animation: nyxusPulse 2s infinite;
+}
+
+.nyxus-header-status-pill.is-disconnected .nyxus-status-pulse-dot {
+  background: #ef4444;
+  box-shadow: 0 0 6px #ef4444;
+}
+
+.nyxus-status-pill-text {
+  line-height: 1;
+}
+
+.nyxus-header-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--nyxus-text-muted);
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.nyxus-header-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+/* Status & Flow */
+.nyxus-flow {
+  max-height: 120px;
+  overflow: auto;
+  border-bottom: 1px solid var(--nyxus-border);
+  color: var(--nyxus-text-muted);
+  font-size: 11px;
+  background: #070709;
+}
+
+.nyxus-flow summary {
+  cursor: pointer;
+  padding: 6px 14px;
+  user-select: none;
+}
+
+.nyxus-flow ol {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  padding: 0 14px 6px 28px;
+}
+
+.nyxus-flow li {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.nyxus-flow time {
+  flex: 0 0 auto;
+  color: var(--nyxus-text-subtle);
+  font-family: var(--nyxus-font-mono);
+}
+
+.nyxus-flow code {
+  overflow-wrap: anywhere;
+  color: var(--nyxus-text);
+  font-family: var(--nyxus-font-mono);
+}
+
+.nyxus-status {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--nyxus-border);
+  background: #08080a;
+}
+
+.nyxus-status-message {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.nyxus-status-message.is-connection {
+  color: #fca5a5;
+}
+
+.nyxus-status-message.is-workspace {
+  color: var(--nyxus-text-muted);
+}
+
+/* Messages area with Subtle Dark Grid */
+.nyxus-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+}
+
+/* Welcome / Hero State */
+.nyxus-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 18px;
+  text-align: center;
+  padding: 24px 8px;
+  max-width: 480px;
+  margin: auto;
+}
+
+.nyxus-welcome-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-family: var(--nyxus-font-mono);
+  font-size: 10px;
+  color: #d4d4d8;
+  letter-spacing: 0.04em;
+}
+
+.nyxus-welcome-ping-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+}
+
+.nyxus-welcome-badge-sep {
+  color: rgba(255, 255, 255, 0.2);
+}
+
+.nyxus-welcome-badge-sub {
+  color: var(--nyxus-text-muted);
+}
+
+.nyxus-welcome-hero-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 22px 18px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(24, 24, 27, 0.6) 0%, rgba(10, 10, 12, 0.8) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.7);
+  width: 100%;
+}
+
+.nyxus-welcome-icon-wrap {
+  width: 50px;
+  height: 50px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  box-shadow: 0 0 25px rgba(255, 255, 255, 0.07);
+}
+
+.nyxus-welcome-title {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #ffffff;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.nyxus-welcome-title-accent {
+  background: linear-gradient(180deg, #ffffff 0%, #a1a1aa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.nyxus-welcome-desc {
+  font-size: 12.5px;
+  color: var(--nyxus-text-muted);
+  line-height: 1.55;
+  margin: 0;
+  max-width: 400px;
+}
+
+.nyxus-welcome-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 100%;
+}
+
+.nyxus-stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 8px;
+  border-radius: 8px;
+  background: rgba(18, 18, 22, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  text-align: center;
+  transition: border-color 0.2s;
+}
+
+.nyxus-stat-card:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.nyxus-stat-value {
+  font-family: var(--nyxus-font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.nyxus-stat-label {
+  font-family: var(--nyxus-font-mono);
+  font-size: 8.5px;
+  color: var(--nyxus-text-subtle);
+  letter-spacing: 0.06em;
+}
+
+/* Chat Messages */
+.nyxus-msg {
+  display: flex;
+  gap: 10px;
+  animation: nyxusFadeIn 0.2s ease-out;
+}
+
+.nyxus-msg.user {
+  flex-direction: row-reverse;
+}
+
+.nyxus-msg-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.nyxus-msg.assistant .nyxus-msg-avatar {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.nyxus-msg.user .nyxus-msg-avatar {
+  background: #18181c;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #a1a1aa;
+}
+
+.nyxus-user-prompt {
+  font-family: var(--nyxus-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: #d4d4d8;
+}
+
+.nyxus-msg-bubble,
+.nyxus-streaming-bubble {
+  padding: 10px 14px;
+  border-radius: var(--nyxus-radius);
+  max-width: 86%;
+  word-break: break-word;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* User Message: Crisp Zinc bubble */
+.nyxus-msg.user .nyxus-msg-bubble {
+  background: #18181b;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #ededed;
+  white-space: pre-wrap;
+  font-family: var(--nyxus-font-sans);
+}
+
+/* Assistant Message: Deep glass Obsidian bubble */
+.nyxus-msg.assistant .nyxus-msg-bubble,
+.nyxus-streaming-bubble {
+  background: rgba(15, 15, 18, 0.85);
+  border: 1px solid var(--nyxus-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #ededed;
+  font-family: var(--nyxus-font-sans);
+}
+
+.nyxus-msg-content-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Pod Startup Loader */
+.nyxus-pod-loader-bubble {
+  background: linear-gradient(135deg, rgba(20, 20, 24, 0.9) 0%, rgba(10, 10, 12, 0.9) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--nyxus-radius);
+  padding: 12px 14px;
+  max-width: 88%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  animation: nyxusFadeIn 0.25s ease-out;
+}
+
+.nyxus-pod-loader-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--nyxus-font-mono);
+  font-size: 9.5px;
+  color: #34d399;
+  letter-spacing: 0.05em;
+}
+
+.nyxus-pod-dot-ping {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+}
+
+.nyxus-pod-loader-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nyxus-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: nyxusSpin 0.75s linear infinite;
+  flex-shrink: 0;
+}
+
+.nyxus-pod-loader-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.nyxus-pod-loader-sub {
+  font-size: 11px;
+  color: var(--nyxus-text-muted);
+  line-height: 1.45;
+}
+
+.nyxus-pod-progress-track {
+  width: 100%;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.nyxus-pod-progress-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #ffffff 0%, #10b981 100%);
+  border-radius: 2px;
+  animation: nyxusPodFill 25s cubic-bezier(0.1, 0.25, 0.25, 1) forwards;
+}
+
+@keyframes nyxusPodFill {
+  0% { width: 0%; }
+  20% { width: 35%; }
+  50% { width: 70%; }
+  80% { width: 88%; }
+  100% { width: 98%; }
+}
+
+/* Envelope Answer Card */
+.nyxus-msg-bubble.has-envelope {
+  background: transparent;
+  border: none;
+  padding: 0;
+  max-width: 96%;
+  width: 100%;
+}
+
+.nyxus-envelope-container {
+  width: 100%;
+  border-radius: var(--nyxus-radius);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.nyxus-envelope-card {
+  background: linear-gradient(135deg, rgba(22, 22, 26, 0.8) 0%, rgba(10, 10, 12, 0.9) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--nyxus-radius);
+  overflow: hidden;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+}
+
+.nyxus-envelope-card:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+}
+
+.nyxus-envelope-container.is-open .nyxus-envelope-card {
+  border-radius: var(--nyxus-radius) var(--nyxus-radius) 0 0;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.15);
+}
+
+.nyxus-envelope-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.nyxus-envelope-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nyxus-envelope-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.nyxus-envelope-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nyxus-envelope-filename {
+  font-weight: 700;
+  font-size: 13px;
+  color: #ffffff;
+  font-family: var(--nyxus-font-mono);
+}
+
+.nyxus-envelope-badge {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #d4d4d8;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  font-family: var(--nyxus-font-mono);
+}
+
+.nyxus-envelope-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nyxus-envelope-action-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: var(--nyxus-text-muted);
+  font-size: 11px;
+  padding: 4px 9px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.nyxus-envelope-action-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+.nyxus-envelope-action-btn.primary {
+  background: #ffffff;
+  color: #030303;
+  font-weight: 600;
+  border-color: #ffffff;
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.2);
+}
+
+.nyxus-envelope-action-btn.primary:hover {
+  background: #f4f4f5;
+  box-shadow: 0 0 18px rgba(255, 255, 255, 0.35);
+}
+
+.nyxus-envelope-toggle-btn {
+  background: transparent;
+  border: none;
+  color: var(--nyxus-text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 4px 6px;
+  font-family: inherit;
+  transition: color 0.15s;
+}
+
+.nyxus-envelope-toggle-btn:hover {
+  color: #ffffff;
+}
+
+.nyxus-envelope-toggle-hint {
+  font-size: 11px;
+  color: #d4d4d8;
+  font-weight: 600;
+}
+
+.nyxus-envelope-flap-preview {
+  padding: 10px 14px 14px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.nyxus-envelope-seal {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--nyxus-text);
+  margin-bottom: 4px;
+}
+
+.nyxus-envelope-seal-icon {
+  color: #ffffff;
+}
+
+.nyxus-envelope-hint-text {
+  font-size: 11px;
+  color: var(--nyxus-text-muted);
+  margin: 0;
+  line-height: 1.45;
+}
+
+.nyxus-envelope-letter {
+  background: rgba(14, 14, 17, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: none;
+  border-radius: 0 0 var(--nyxus-radius) var(--nyxus-radius);
+  padding: 14px 16px;
+  animation: nyxusEnvelopeUnfold 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: top center;
+}
+
+@keyframes nyxusEnvelopeUnfold {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scaleY(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+
+.nyxus-envelope-letter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.nyxus-envelope-letter-tag {
+  font-size: 11px;
+  color: var(--nyxus-text-muted);
+  font-family: var(--nyxus-font-mono);
+}
+
+/* Action Button to Open answer.md */
+.nyxus-view-answer-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: #ededed;
+  font-size: 11px;
+  font-family: var(--nyxus-font-mono);
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  align-self: flex-start;
+}
+
+.nyxus-view-answer-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+}
+
+/* Markdown Rendering */
+.nyxus-markdown {
+  color: var(--nyxus-text);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.nyxus-markdown p {
+  margin: 0 0 10px;
+}
+.nyxus-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.nyxus-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 12px;
+  overflow-x: auto;
+  display: block;
+}
+
+.nyxus-markdown th,
+.nyxus-markdown td {
+  border: 1px solid var(--nyxus-border);
+  padding: 6px 10px;
+  text-align: left;
+}
+
+.nyxus-markdown th {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.nyxus-markdown tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.nyxus-markdown pre {
+  background: #09090c;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  margin: 10px 0;
+}
+
+.nyxus-markdown code {
+  font-family: var(--nyxus-font-mono);
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 5px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.nyxus-markdown pre code {
+  background: transparent;
+  padding: 0;
+  border: none;
+}
+
+.nyxus-markdown blockquote {
+  border-left: 3px solid #ffffff;
+  margin: 10px 0;
+  padding: 4px 12px;
+  color: var(--nyxus-text-muted);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 0 4px 4px 0;
+}
+
+.nyxus-markdown h1,
+.nyxus-markdown h2,
+.nyxus-markdown h3 {
+  margin: 14px 0 8px;
+  color: #ffffff;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.nyxus-markdown ul,
+.nyxus-markdown ol {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+
+/* Mermaid Blocks */
+.nyxus-mermaid-block {
+  margin: 14px 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow-x: auto;
+  display: flex;
+  justify-content: center;
+}
+
+.nyxus-mermaid-block svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.nyxus-mermaid-block.loading {
+  padding: 16px;
+  color: var(--nyxus-text-muted);
+  font-size: 12px;
+}
+
+.nyxus-mermaid-block.error {
+  border-color: rgba(248, 81, 73, 0.4);
+  background: rgba(248, 81, 73, 0.05);
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.nyxus-mermaid-header {
+  font-size: 11px;
+  color: rgba(248, 81, 73, 0.85);
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.nyxus-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: #ffffff;
+  margin-left: 2px;
+  animation: nyxusPulse 0.8s infinite;
+}
+
+/* Input Area */
+.nyxus-input-area {
+  padding: 12px 14px 14px;
+  border-top: 1px solid var(--nyxus-border);
+  background: rgba(10, 10, 13, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.nyxus-readme-toggle {
+  margin-bottom: 8px;
+  padding: 5px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 9999px;
+  background: rgba(18, 18, 22, 0.7);
+  color: var(--nyxus-text-muted);
+  cursor: pointer;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-family: var(--nyxus-font-mono);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.nyxus-readme-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #52525b;
+  transition: all 0.2s ease;
+}
+
+.nyxus-readme-toggle:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ededed;
+}
+
+.nyxus-readme-toggle.active {
+  color: #ffffff;
+  border-color: rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.nyxus-readme-toggle.active .nyxus-readme-dot {
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+}
+
+.nyxus-input-wrapper {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  background: #0d0d10;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--nyxus-radius);
+  padding: 6px 6px 6px 12px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.nyxus-input-wrapper:focus-within {
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.04);
+}
+
+.nyxus-textarea {
+  flex: 1;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--nyxus-text);
+  font-family: var(--nyxus-font-mono);
+  font-size: 13px;
+  min-height: 36px;
+  max-height: 120px;
+  line-height: 1.5;
+  padding: 6px 0;
+}
+
+.nyxus-textarea::placeholder {
+  color: var(--nyxus-text-subtle);
+}
+
+/* Crisp Solid White Send Button */
+.nyxus-send-btn {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  color: #000000;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.nyxus-send-btn:hover:not(:disabled) {
+  background: #f4f4f5;
+  transform: translateY(-1px);
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.3);
+}
+
+.nyxus-send-btn:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+  background: #3f3f46;
+  color: #71717a;
+}
+
+.nyxus-streaming-bubble.is-readme {
+  background: linear-gradient(135deg, rgba(22, 22, 26, 0.85) 0%, rgba(10, 10, 12, 0.95) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  max-width: 96%;
+  width: 100%;
+}
+
+.nyxus-streaming-readme {
+  position: relative;
+}
+
+.nyxus-streaming-readme .nyxus-cursor {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+}

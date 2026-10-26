@@ -39,6 +39,10 @@
       {
         "command": "nyxusReplica.openSidebar",
         "title": "Open Nyxus Replica Sidebar"
+      },
+      {
+        "command": "nyxusReplica.clearChat",
+        "title": "Nyxus: Clear Conversation"
       }
     ],
     "configuration": {

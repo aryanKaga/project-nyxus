@@ -12,7 +12,7 @@ const result = await users.updateOne(
     $set: {
       user_name,
       email,
-      max_limit: 3
+      max_limit: 10
     },
     $setOnInsert: {
       user_id,

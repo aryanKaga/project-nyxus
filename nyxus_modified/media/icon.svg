@@ -1,44 +1,49 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <!-- Outer circle background -->
-  <circle cx="64" cy="64" r="62" fill="currentColor" opacity="0.1"/>
-  <circle cx="64" cy="64" r="58" fill="none" stroke="currentColor" stroke-width="2"/>
-  
-  <!-- Robot head -->
-  <rect x="38" y="30" width="52" height="50" rx="8" fill="currentColor" opacity="0.9"/>
-  
-  <!-- Left eye -->
-  <circle cx="48" cy="45" r="6" fill="currentColor" opacity="0.3"/>
-  <circle cx="48" cy="45" r="3" fill="currentColor"/>
-  
-  <!-- Right eye -->
-  <circle cx="80" cy="45" r="6" fill="currentColor" opacity="0.3"/>
-  <circle cx="80" cy="45" r="3" fill="currentColor"/>
-  
-  <!-- Antenna left -->
-  <line x1="45" y1="28" x2="42" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-  <circle cx="42" cy="12" r="2" fill="currentColor"/>
-  
-  <!-- Antenna right -->
-  <line x1="83" y1="28" x2="86" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-  <circle cx="86" cy="12" r="2" fill="currentColor"/>
-  
-  <!-- Mouth -->
-  <path d="M 55 58 Q 64 62 73 58" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-  
-  <!-- Body -->
-  <rect x="44" y="78" width="40" height="35" rx="6" fill="currentColor" opacity="0.7"/>
-  
-  <!-- Chest panel lines -->
-  <line x1="52" y1="85" x2="76" y2="85" stroke="currentColor" stroke-width="1" opacity="0.5"/>
-  <line x1="52" y1="92" x2="76" y2="92" stroke="currentColor" stroke-width="1" opacity="0.5"/>
-  <line x1="52" y1="99" x2="76" y2="99" stroke="currentColor" stroke-width="1" opacity="0.5"/>
-  
-  <!-- Left arm -->
-  <rect x="28" y="90" width="14" height="8" rx="4" fill="currentColor" opacity="0.8"/>
-  
-  <!-- Right arm -->
-  <rect x="86" y="90" width="14" height="8" rx="4" fill="currentColor" opacity="0.8"/>
-  
-  <!-- LED indicator -->
-  <circle cx="64" cy="110" r="2.5" fill="#00ff00" opacity="0.8"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <g transform="translate(256, 256) scale(1.16) translate(-293, -308)" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Outer silhouette: ears, forehead, muzzle, throat and chest -->
+    <path stroke-width="26" d="M111 253
+      C101 225 99 194 106 158
+      C135 161 166 177 193 198
+      L220 150
+      C240 165 254 188 263 210
+      C282 204 301 204 321 210
+      C344 217 360 208 382 193
+      L405 178"/>
+    <path stroke-width="26" d="M111 253
+      C120 275 135 291 153 302
+      C132 324 119 346 111 369
+      C136 356 155 335 170 315
+      C161 343 159 371 165 397
+      C175 380 189 361 207 347
+      C196 374 195 402 207 425
+      C220 450 246 462 269 481"/>
+    <!-- Muzzle and nose bridge -->
+    <path stroke-width="26" d="M191 198
+      C210 214 224 224 245 225
+      C270 226 290 219 312 218
+      C339 217 360 204 382 193"/>
+    <path stroke-width="26" d="M312 218
+      C341 226 369 215 391 197
+      C403 187 412 178 420 171"/>
+    <!-- Upturned muzzle underside -->
+    <path stroke-width="22" d="M244 246
+      C272 253 303 251 329 240
+      C359 228 382 208 399 188"/>
+    <!-- Neck and fur accents -->
+    <path stroke-width="18" d="M167 315 C186 302 198 284 205 266"/>
+    <path stroke-width="18" d="M207 347 C223 330 236 314 243 294"/>
+    <path stroke-width="18" d="M207 425 C226 414 241 399 251 381"/>
+    <!-- Closed alert eye -->
+    <path stroke-width="18" d="M271 232 C286 219 302 218 316 224"/>
+    <!-- Ear detail -->
+    <path stroke-width="18" d="M121 174 C143 179 161 190 176 204"/>
+    <!-- Nose: solid fill -->
+    <path fill="currentColor" stroke="none" d="M404 176
+      C414 166 426 160 435 162
+      C442 164 445 177 444 189
+      C432 191 419 187 404 176 Z"/>
+    <!-- Scent marks -->
+    <path stroke-width="16" d="M455 157 C465 150 467 141 463 134"/>
+    <path stroke-width="16" d="M470 174 C482 169 486 160 483 152"/>
+  </g>
 </svg>
