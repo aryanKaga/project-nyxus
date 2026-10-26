@@ -72,6 +72,12 @@
           "scope": "machine",
           "description": "User ID sent with Nyxus workspace requests."
         },
+        "nyxusReplica.apiKey": {
+          "type": "string",
+          "default": "abc@123",
+          "scope": "machine",
+          "description": "API Key used to authenticate Nyxus requests."
+        },
         "nyxusReplica.requestTimeout": {
           "type": "number",
           "default": 15000,
