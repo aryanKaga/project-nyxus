@@ -2,7 +2,7 @@
   "name": "nyxus-coding-agent-replica",
   "displayName": "Nyxus",
   "description": "Nyxus - Autonomous Coding Agent",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "publisher": "aryanKaga",
   "repository": {
     "type": "git",
@@ -80,11 +80,19 @@
         },
         "nyxusReplica.requestTimeout": {
           "type": "number",
-          "default": 15000,
+          "default": 30000,
           "minimum": 1000,
-          "maximum": 120000,
+          "maximum": 600000,
           "scope": "application",
           "description": "Maximum time in milliseconds to wait for a Nyxus server acknowledgement."
+        },
+        "nyxusReplica.uploadTimeout": {
+          "type": "number",
+          "default": 300000,
+          "minimum": 10000,
+          "maximum": 600000,
+          "scope": "application",
+          "description": "Maximum time in milliseconds to wait for Git workspace transfer, unpacking, and database saving (default: 300,000ms / 5 minutes)."
         },
         "nyxusReplica.enableWorkspaceSync": {
           "type": "boolean",

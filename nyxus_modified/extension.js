@@ -125,7 +125,34 @@ function activate(context) {
         void vscode.window.showInformationMessage('Nyxus conversation cleared.');
     });
 
-    context.subscriptions.push(output, sayHi, setApiKey, openNativeSettings, sidebar, openSidebar, openSettings, clearChat, cleanup);
+    const uriHandler = typeof vscode.window.registerUriHandler === 'function'
+        ? vscode.window.registerUriHandler({
+            async handleUri(uri) {
+                output.appendLine(`Nyxus received URI deep link: ${uri.toString()}`);
+                try {
+                    const params = new URLSearchParams(uri.query);
+                    const userId = params.get('userId') || params.get('user_id') || params.get('email');
+                    if (userId && userId.trim()) {
+                        const cleanUserId = userId.trim();
+                        const { setUserId } = require('./webviewprovider/user_id_storage');
+                        await setUserId(context, cleanUserId);
+                        output.appendLine(`Nyxus configured User ID from URI deep link: ${cleanUserId}`);
+                        vscode.window.showInformationMessage(`Nyxus configured with User ID: ${cleanUserId}`);
+                        await vscode.commands.executeCommand('workbench.view.extension.nyxusReplica');
+                        if (sidebarProvider) {
+                            sidebarProvider.sendMessage({ type: 'save_user_id_result', ok: true, userId: cleanUserId });
+                            sidebarProvider.sendMessage({ type: 'workspace_info', userId: cleanUserId, user_id: cleanUserId });
+                            await sidebarProvider.reconnect?.();
+                        }
+                    }
+                } catch (err) {
+                    output.appendLine(`Failed to handle URI: ${err instanceof Error ? err.message : String(err)}`);
+                }
+            }
+        })
+        : { dispose() {} };
+
+    context.subscriptions.push(output, sayHi, setApiKey, openNativeSettings, sidebar, openSidebar, openSettings, cleanup, clearChat, uriHandler);
     if (configurationListener) context.subscriptions.push(configurationListener);
 }
 
