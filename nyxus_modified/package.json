@@ -1,8 +1,8 @@
 {
   "name": "nyxus-coding-agent-replica",
   "displayName": "Nyxus",
-  "description": "Nyxus - Autonomous Coding Agent",
-  "version": "0.0.7",
+  "description": "Repository intelligence for VS Code — trace data flows, map architecture, and generate diagrams across your entire codebase using a fast cloud AI harness.",
+  "version": "0.0.8",
   "publisher": "aryanKaga",
   "repository": {
     "type": "git",
