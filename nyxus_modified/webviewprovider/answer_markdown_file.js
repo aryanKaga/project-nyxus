@@ -3,7 +3,21 @@ const path = require('node:path');
 
 const MAX_ANSWER_BYTES = 2 * 1024 * 1024;
 
-async function saveAnswerMarkdown(workspaceRoot, filename, markdown) {
+function sanitizeMermaid(text) {
+    if (typeof text !== 'string' || !text.includes('```mermaid')) return text;
+    return text.replace(/```mermaid([\s\S]*?)```/g, (match, code) => {
+        // Strip quotes inside edge pipes: | "something" | -> |something|
+        let cleaned = code.replace(/(\|)\s*["']\s*(.*?)\s*["']\s*(\|)/g, '$1$2$3');
+        // Replace & inside edge pipes with "and"
+        cleaned = cleaned.replace(/(\|)([^|\n]*?)(\|)/g, (m, p1, inner, p2) => {
+            return p1 + inner.replace(/&/g, 'and') + p2;
+        });
+        return '```mermaid' + cleaned + '```';
+    });
+}
+
+async function saveAnswerMarkdown(workspaceRoot, filename, rawMarkdown) {
+    const markdown = sanitizeMermaid(rawMarkdown);
     if (
         filename !== 'answer.md'
         || typeof markdown !== 'string'
