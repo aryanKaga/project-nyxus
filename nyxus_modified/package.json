@@ -2,7 +2,7 @@
   "name": "nyxus-coding-agent-replica",
   "displayName": "Nyxus",
   "description": "Nyxus - Autonomous Coding Agent",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "publisher": "aryanKaga",
   "repository": {
     "type": "git",
