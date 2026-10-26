@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="90 120 405 375" fill="none">
-  <g stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <g transform="translate(256, 256) scale(1.16) translate(-293, -308)" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
     <!-- Outer silhouette: ears, forehead, muzzle, throat and chest -->
-    <path stroke-width="18" d="M111 253
+    <path stroke-width="26" d="M111 253
       C101 225 99 194 106 158
       C135 161 166 177 193 198
       L220 150
@@ -9,7 +9,7 @@
       C282 204 301 204 321 210
       C344 217 360 208 382 193
       L405 178"/>
-    <path stroke-width="18" d="M111 253
+    <path stroke-width="26" d="M111 253
       C120 275 135 291 153 302
       C132 324 119 346 111 369
       C136 356 155 335 170 315
@@ -18,34 +18,32 @@
       C196 374 195 402 207 425
       C220 450 246 462 269 481"/>
     <!-- Muzzle and nose bridge -->
-    <path stroke-width="18" d="M191 198
+    <path stroke-width="26" d="M191 198
       C210 214 224 224 245 225
       C270 226 290 219 312 218
       C339 217 360 204 382 193"/>
-    <path stroke-width="18" d="M312 218
+    <path stroke-width="26" d="M312 218
       C341 226 369 215 391 197
       C403 187 412 178 420 171"/>
     <!-- Upturned muzzle underside -->
-    <path stroke-width="16" d="M244 246
+    <path stroke-width="22" d="M244 246
       C272 253 303 251 329 240
       C359 228 382 208 399 188"/>
-    <!-- Neck/fur accents -->
-    <path stroke-width="13" d="M167 315 C186 302 198 284 205 266"/>
-    <path stroke-width="13" d="M207 347 C223 330 236 314 243 294"/>
-    <path stroke-width="13" d="M207 425 C226 414 241 399 251 381"/>
-    <!-- Closed, alert eye -->
-    <path stroke-width="14" d="M271 232 C286 219 302 218 316 224"/>
+    <!-- Neck and fur accents -->
+    <path stroke-width="18" d="M167 315 C186 302 198 284 205 266"/>
+    <path stroke-width="18" d="M207 347 C223 330 236 314 243 294"/>
+    <path stroke-width="18" d="M207 425 C226 414 241 399 251 381"/>
+    <!-- Closed alert eye -->
+    <path stroke-width="18" d="M271 232 C286 219 302 218 316 224"/>
     <!-- Ear detail -->
-    <path stroke-width="14" d="M121 174 C143 179 161 190 176 204"/>
-  </g>
-  <!-- Nose: solid fill -->
-  <path fill="currentColor" d="M404 176
-    C414 166 426 160 435 162
-    C442 164 445 177 444 189
-    C432 191 419 187 404 176 Z"/>
-  <!-- Scent marks -->
-  <g fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round">
-    <path d="M455 157 C465 150 467 141 463 134"/>
-    <path d="M470 174 C482 169 486 160 483 152"/>
+    <path stroke-width="18" d="M121 174 C143 179 161 190 176 204"/>
+    <!-- Nose: solid fill -->
+    <path fill="currentColor" stroke="none" d="M404 176
+      C414 166 426 160 435 162
+      C442 164 445 177 444 189
+      C432 191 419 187 404 176 Z"/>
+    <!-- Scent marks -->
+    <path stroke-width="16" d="M455 157 C465 150 467 141 463 134"/>
+    <path stroke-width="16" d="M470 174 C482 169 486 160 483 152"/>
   </g>
 </svg>
