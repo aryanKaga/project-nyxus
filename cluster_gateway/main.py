@@ -598,6 +598,10 @@ async def gateway_chat(sid, data):
             pod, _, _ = await asyncio.to_thread(ensure_runtime, ref)
         print('found pod and now sending request')
         agent_client = await get_or_connect_agent(runtime_id, pod)
+        try:
+            await sio.emit("server_ping", {"status": "pod_ready"}, to=sid)
+        except Exception:
+            pass
         ack = await agent_client.call("chat", data, timeout=30)
         return ack
     except Exception as exc:

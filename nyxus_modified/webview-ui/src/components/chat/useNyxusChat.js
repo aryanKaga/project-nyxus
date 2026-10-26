@@ -18,6 +18,7 @@ export function useNyxusChat() {
   });
   const [streamingText, setStreamingText] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isWaitingForServer, setIsWaitingForServer] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState("connecting");
   const [connectionMessage, setConnectionMessage] = useState("");
   const [workspaceSyncStatus, setWorkspaceSyncStatus] = useState("Waiting to start.");
@@ -30,8 +31,10 @@ export function useNyxusChat() {
 
   const streamingTextRef = useRef("");
   const isStreamingRef = useRef(false);
+  const isWaitingForServerRef = useRef(false);
   const pendingReadmeRef = useRef(true);
   const stallTimerRef = useRef(null);
+  const podStartupTimerRef = useRef(null);
   const messagesEndRef = useRef(null);
 
   const clearStallTimer = useCallback(() => {
@@ -41,8 +44,18 @@ export function useNyxusChat() {
     }
   }, []);
 
+  const clearPodStartupTimer = useCallback(() => {
+    if (podStartupTimerRef.current !== null) {
+      clearTimeout(podStartupTimerRef.current);
+      podStartupTimerRef.current = null;
+    }
+  }, []);
+
   const finishStream = useCallback((message, format) => {
     clearStallTimer();
+    clearPodStartupTimer();
+    isWaitingForServerRef.current = false;
+    setIsWaitingForServer(false);
     setMessages((current) => [
       ...current,
       { role: "assistant", text: message, ...(format ? { format } : {}) },
@@ -51,7 +64,7 @@ export function useNyxusChat() {
     setStreamingText("");
     isStreamingRef.current = false;
     setIsStreaming(false);
-  }, [clearStallTimer]);
+  }, [clearStallTimer, clearPodStartupTimer]);
 
   const armStallTimer = useCallback(() => {
     clearStallTimer();
@@ -93,7 +106,20 @@ export function useNyxusChat() {
             { role: "assistant", text: message.text ?? "Workspace initialization failed." },
           ]);
           break;
+        case "server_ping":
+          clearPodStartupTimer();
+          isWaitingForServerRef.current = false;
+          setIsWaitingForServer(false);
+          streamingTextRef.current = "";
+          setStreamingText("");
+          isStreamingRef.current = true;
+          setIsStreaming(true);
+          armStallTimer();
+          break;
         case "assistant_start":
+          clearPodStartupTimer();
+          isWaitingForServerRef.current = false;
+          setIsWaitingForServer(false);
           streamingTextRef.current = "";
           setStreamingText("");
           isStreamingRef.current = true;
@@ -102,11 +128,23 @@ export function useNyxusChat() {
           armStallTimer();
           break;
         case "assistant_progress":
-          if (isStreamingRef.current) {
-            armStallTimer();
+          clearPodStartupTimer();
+          isWaitingForServerRef.current = false;
+          setIsWaitingForServer(false);
+          if (!isStreamingRef.current) {
+            isStreamingRef.current = true;
+            setIsStreaming(true);
           }
+          armStallTimer();
           break;
         case "assistant_chunk": {
+          clearPodStartupTimer();
+          isWaitingForServerRef.current = false;
+          setIsWaitingForServer(false);
+          if (!isStreamingRef.current) {
+            isStreamingRef.current = true;
+            setIsStreaming(true);
+          }
           const chunk = typeof message.text === "string" ? message.text : "";
           if (!chunk) {
             return;
@@ -133,6 +171,9 @@ export function useNyxusChat() {
           pendingReadmeRef.current = false;
           break;
         case "assistant_error": {
+          clearPodStartupTimer();
+          isWaitingForServerRef.current = false;
+          setIsWaitingForServer(false);
           const detail = typeof message.error === "string" ? message.error : "Unknown error";
           const partial = streamingTextRef.current;
           finishStream(
@@ -148,6 +189,9 @@ export function useNyxusChat() {
         }
         case "response":
           clearStallTimer();
+          clearPodStartupTimer();
+          isWaitingForServerRef.current = false;
+          setIsWaitingForServer(false);
           setMessages((current) => [
             ...current,
             { role: "assistant", text: typeof message.text === "string" ? message.text : "" },
@@ -166,6 +210,9 @@ export function useNyxusChat() {
           }
           break;
         case "clear_conversation":
+          clearPodStartupTimer();
+          isWaitingForServerRef.current = false;
+          setIsWaitingForServer(false);
           setMessages([]);
           try {
             const prevState = typeof vscode.getState === "function" ? (vscode.getState() || {}) : {};
@@ -186,12 +233,13 @@ export function useNyxusChat() {
     return () => {
       window.removeEventListener("message", handleMessage);
       clearStallTimer();
+      clearPodStartupTimer();
     };
-  }, [armStallTimer, clearStallTimer, finishStream]);
+  }, [armStallTimer, clearPodStartupTimer, clearStallTimer, finishStream]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamingText]);
+  }, [messages, streamingText, isWaitingForServer]);
 
   useEffect(() => {
     try {
@@ -213,7 +261,7 @@ export function useNyxusChat() {
 
   const sendMessage = useCallback((prompt, useReadmeMode = true) => {
     const text = prompt.trim();
-    if (!text || isStreamingRef.current) {
+    if (!text || isStreamingRef.current || isWaitingForServerRef.current) {
       return false;
     }
 
@@ -221,9 +269,28 @@ export function useNyxusChat() {
     pendingReadmeRef.current = useReadmeMode !== false;
     streamingTextRef.current = "";
     setStreamingText("");
+    isStreamingRef.current = false;
+    setIsStreaming(false);
+
+    // Set waiting state for agent pod creation
+    isWaitingForServerRef.current = true;
+    setIsWaitingForServer(true);
+
+    clearPodStartupTimer();
+    clearStallTimer();
+    podStartupTimerRef.current = setTimeout(() => {
+      clearPodStartupTimer();
+      isWaitingForServerRef.current = false;
+      setIsWaitingForServer(false);
+      finishStream(
+        "**Error:** Nyxus agent pod startup timed out (no contact from server within 30 seconds). The Kubernetes cluster may still be provisioning resources. Please try sending your message again.",
+        pendingReadmeRef.current ? "readme" : undefined
+      );
+    }, STREAM_STALL_TIMEOUT_MS);
+
     vscode.postMessage({ type: "chat", prompt: text, readmeMode: useReadmeMode !== false });
     return true;
-  }, []);
+  }, [clearPodStartupTimer, clearStallTimer, finishStream]);
 
   const openReadmeAnswer = useCallback((markdown) => {
     vscode.postMessage({
@@ -239,6 +306,7 @@ export function useNyxusChat() {
     flowEvents,
     isReadmeStreaming: isStreaming && pendingReadmeRef.current,
     isStreaming,
+    isWaitingForServer,
     messages,
     messagesEndRef,
     openReadmeAnswer,

@@ -69,6 +69,16 @@ async function createWebSocket(webview, logFlow, context, onArchitectureDiagram,
         });
     });
 
+    socket.on('server_ping', (data) => {
+        logFlow('receive.server_ping');
+        postMessage({ type: 'server_ping', data });
+    });
+
+    socket.on('ping', (data) => {
+        logFlow('receive.server_ping');
+        postMessage({ type: 'server_ping', data });
+    });
+
     socket.on('assistant_start', () => {
         logFlow('receive.assistant_start');
         postMessage({ type: 'assistant_start' });

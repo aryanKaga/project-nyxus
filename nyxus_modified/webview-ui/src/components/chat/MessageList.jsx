@@ -54,6 +54,26 @@ function ChatMessage({ message, onOpenAnswer, isLatest }) {
   );
 }
 
+function PodStartupLoader() {
+  return (
+    <article className="nyxus-msg assistant">
+      <div className="nyxus-msg-avatar"><NyxusIcon size={14} /></div>
+      <div className="nyxus-pod-loader-bubble">
+        <div className="nyxus-pod-loader-header">
+          <div className="nyxus-spinner" />
+          <span className="nyxus-pod-loader-title">Starting agent pod...</span>
+        </div>
+        <div className="nyxus-pod-loader-sub">
+          Provisioning container environment (up to ~30s on cold start)
+        </div>
+        <div className="nyxus-pod-progress-track">
+          <div className="nyxus-pod-progress-bar" />
+        </div>
+      </div>
+    </article>
+  );
+}
+
 function StreamingMessage({ text, isReadme }) {
   return (
     <article className="nyxus-msg assistant">
@@ -77,12 +97,13 @@ function StreamingMessage({ text, isReadme }) {
 export default function MessageList({
   isStreaming,
   isReadmeStreaming,
+  isWaitingForServer,
   messages,
   messagesEndRef,
   onOpenAnswer,
   streamingText,
 }) {
-  const showWelcome = messages.length === 0 && !isStreaming;
+  const showWelcome = messages.length === 0 && !isStreaming && !isWaitingForServer;
   const lastIndex = messages.length - 1;
 
   return (
@@ -96,6 +117,7 @@ export default function MessageList({
           isLatest={index === lastIndex}
         />
       ))}
+      {isWaitingForServer && !isStreaming && <PodStartupLoader />}
       {isStreaming && <StreamingMessage text={streamingText} isReadme={isReadmeStreaming} />}
       <div ref={messagesEndRef} />
     </section>
