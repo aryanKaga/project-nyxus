@@ -3,10 +3,14 @@
   "displayName": "Nyxus Modified",
   "description": "Nyxus Modified - Coding Agent",
   "version": "0.0.1",
-  "publisher": "your-name",
+  "publisher": "nyxus",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aryanKaga/project-nyxus"
+  },
   "main": "./extension.js",
   "engines": {
-    "vscode": "^1.120.0"
+    "vscode": "^1.85.0"
   },
   "categories": [
     "Other"
@@ -58,7 +62,7 @@
       "properties": {
         "nyxusReplica.url": {
           "type": "string",
-          "default": "http://localhost:80",
+          "default": "http://54.79.152.236",
           "scope": "machine",
           "description": "Base URL of the Nyxus server used for chat, workspace uploads, and workspace ID requests."
         },
@@ -124,7 +128,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "@types/vscode": "^1.120.0",
+    "@types/vscode": "^1.85.0",
     "vsce": "^1.97.0"
   },
   "directories": {
