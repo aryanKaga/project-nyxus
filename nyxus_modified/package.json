@@ -1,7 +1,7 @@
 {
-  "name": "nyxus-coding-agent-replica",
-  "displayName": "Nyxus Modified",
-  "description": "Nyxus Modified - Coding Agent",
+  "name": "nyxus",
+  "displayName": "Nyxus",
+  "description": "Nyxus - Autonomous Coding Agent",
   "version": "0.0.2",
   "publisher": "aryanKaga",
   "repository": {
@@ -20,7 +20,7 @@
       "activitybar": [
         {
           "id": "nyxusReplica",
-          "title": "Nyxus Modified",
+          "title": "Nyxus",
           "icon": "media/icon.svg"
         }
       ]
@@ -42,7 +42,7 @@
       },
       {
         "command": "nyxusReplica.openSidebar",
-        "title": "Open Nyxus Modified Sidebar"
+        "title": "Open Nyxus Sidebar"
       },
       {
         "command": "nyxusReplica.openSettings",

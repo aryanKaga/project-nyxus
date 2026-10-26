@@ -978,7 +978,7 @@ class SidebarProvider {
         return `<!DOCTYPE html>
 <html>
 <body style="font-family: sans-serif; padding: 12px; color: var(--vscode-foreground); background: var(--vscode-editor-background);">
-    <h3>Nyxus Modified could not load its chat UI</h3>
+    <h3>Nyxus could not load its chat UI</h3>
     <pre style="white-space: pre-wrap; font-size: 12px;">${message}</pre>
     <p>Run <code>npm run build</code> in the extension folder, then reload the window.</p>
 </body>
