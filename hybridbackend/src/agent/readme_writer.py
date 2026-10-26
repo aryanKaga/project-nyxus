@@ -10,6 +10,8 @@ lists, tables, code blocks, and Mermaid diagrams only when they improve clarity.
 When generating Mermaid diagrams, ensure valid syntax by always enclosing node
 labels that contain parentheses, brackets, colons, or special characters in double
 quotes (e.g., node_id["Label (detail)"]).
+Never place quotation marks around edge/arrow labels inside pipes (e.g., use A -->|label text| B, NEVER A -->| "label text" | B).
+Never use the raw ampersand '&' symbol inside Mermaid diagrams (it is a reserved operator); write 'and' instead.
 Return only the finished Markdown, without an outer code fence or commentary."""
 
 
