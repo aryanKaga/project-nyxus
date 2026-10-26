@@ -44,8 +44,9 @@ export default function ChatInput({ disabled, onSend, readmeMode, onReadmeModeCh
         onClick={() => onReadmeModeChange && onReadmeModeChange(!readmeMode)}
         title="Format Nyxus answers as polished Markdown and save them to answer.md"
       >
-        <EnvelopeIcon size={14} />
-        <span>README mode {readmeMode ? "On" : "Off"}</span>
+        <span className="nyxus-readme-dot" />
+        <EnvelopeIcon size={13} />
+        <span>README mode: {readmeMode ? "ON" : "OFF"}</span>
       </button>
       <div className="nyxus-input-wrapper">
         <textarea
