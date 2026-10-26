@@ -2,7 +2,7 @@
   "name": "nyxus-coding-agent-replica",
   "displayName": "Nyxus Modified",
   "description": "Nyxus Modified - Coding Agent",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "nyxus",
   "repository": {
     "type": "git",
